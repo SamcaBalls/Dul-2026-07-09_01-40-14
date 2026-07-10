@@ -1,0 +1,10 @@
+fileFormatVersion: 2
+guid: 14715937fc71f2049853cf811a0cbc60
+timeCreated: 1697614508
+AssetOrigin:
+  serializedVersion: 1
+  productId: 271730
+  packageName: Pixelation Fx
+  packageVersion: 1.5.3
+  assetPath: Assets/Pixelation/Runtime/Common/ShaderNameAttribute.cs
+  uploadId: 777000

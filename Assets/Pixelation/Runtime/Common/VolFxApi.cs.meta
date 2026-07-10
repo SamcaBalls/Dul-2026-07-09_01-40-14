@@ -1,0 +1,10 @@
+fileFormatVersion: 2
+guid: 72a5ce785eeb3194189d2550281ef33c
+timeCreated: 1729157076
+AssetOrigin:
+  serializedVersion: 1
+  productId: 271730
+  packageName: Pixelation Fx
+  packageVersion: 1.5.3
+  assetPath: Assets/Pixelation/Runtime/Common/VolFxApi.cs
+  uploadId: 777000

@@ -1,0 +1,10 @@
+fileFormatVersion: 2
+guid: 14ba4625d5562404f9f843158bcce61c
+timeCreated: 1676448249
+AssetOrigin:
+  serializedVersion: 1
+  productId: 271730
+  packageName: Pixelation Fx
+  packageVersion: 1.5.3
+  assetPath: Assets/Pixelation/Runtime/Pixelation/PixelationPass.cs
+  uploadId: 777000

@@ -45,6 +45,8 @@ public class PlayerRigidbodyMovement : MonoBehaviour
     public float vaultCheckDistance = 1.2f;
     public float vaultMaxHeight = 1.5f;
     public float vaultDuration = 0.4f;
+    [Tooltip("Kolikrát RYCHLEJŠÍ bude přelézání, pokud hráč u toho sprintuje. Vyšší číslo = rychlejší vault.")]
+    public float vaultSprintSpeedMultiplier = 1.5f; // <-- NOVÁ PROMĚNNÁ
     [Tooltip("Výška od země hráče, ze které se střílí Raycast dopředu.")]
     public float vaultCheckHeightOffset = 0.2f;
     [Tooltip("Jak hluboko za bod nárazu má systém koukat, aby našel zem pro dopad (tloušťka zdi + rezerva).")]
@@ -62,7 +64,7 @@ public class PlayerRigidbodyMovement : MonoBehaviour
     
     private float rotationX = 0;
     private float defaultCameraY;
-    private float defaultCameraHolderY; // <-- ZDE JE CHYBĚJÍCÍ PROMĚNNÁ
+    private float defaultCameraHolderY; 
     private float bobTimer = 0;
     
     private bool isCrouching = false;
@@ -152,7 +154,6 @@ public class PlayerRigidbodyMovement : MonoBehaviour
         {
             targetBodyRotation *= Quaternion.Euler(0, lookInput.x * lookSpeed * 0.05f, 0);
 
-            // Plynulé vyhlazení pohybu kamery a těla (Sliding)
             cameraHolder.localRotation = Quaternion.Slerp(cameraHolder.localRotation, targetHolderRot, Time.deltaTime * cameraSmoothing);
             transform.rotation = Quaternion.Slerp(transform.rotation, targetBodyRotation, Time.deltaTime * cameraSmoothing);
         }
@@ -185,14 +186,13 @@ public class PlayerRigidbodyMovement : MonoBehaviour
     {
         if (crouchAction == null) return;
 
-        // Crouch na HOLD
         bool crouchButtonPressed = crouchAction.action.IsPressed();
 
         if (crouchButtonPressed)
         {
             isCrouching = true;
         }
-        else if (isCrouching) // Puštěné tlačítko -> kontrola stropu před vstaním
+        else if (isCrouching) 
         {
             Vector3 origin = transform.position + Vector3.up * (capsuleCollider.height * 0.5f);
             Debug.DrawRay(origin, Vector3.up * ceilingCheckDistance, Color.yellow);
@@ -200,11 +200,11 @@ public class PlayerRigidbodyMovement : MonoBehaviour
             float radius = capsuleCollider.radius * 0.9f;
             if (Physics.SphereCast(origin, radius, Vector3.up, out RaycastHit hit, ceilingCheckDistance, groundLayer | obstacleLayer))
             {
-                isCrouching = true; // Strop detekován, zůstává skrčený
+                isCrouching = true; 
             }
             else
             {
-                isCrouching = false; // Volno, může se postavit
+                isCrouching = false; 
             }
         }
 
@@ -252,18 +252,16 @@ public class PlayerRigidbodyMovement : MonoBehaviour
 
         Vector2 moveInput = moveAction.action.ReadValue<Vector2>();
 
-        if (moveInput.y <= 0.1f) return; // Musí jít dopředu
+        if (moveInput.y <= 0.1f) return; 
 
         Vector3 origin = transform.position + Vector3.up * vaultCheckHeightOffset;
         
         if (Physics.Raycast(origin, transform.forward, out RaycastHit hit, vaultCheckDistance, obstacleLayer))
         {
-            // Detekce země ZA překážkou (velký dosah 10f)
             Vector3 airOrigin = hit.point + (transform.forward * vaultWallThicknessOffset) + (Vector3.up * vaultMaxHeight);
             
             if (Physics.Raycast(airOrigin, Vector3.down, out RaycastHit groundHit, 10f))
             {
-                // Zpětná kontrola šířky překážky
                 Vector3 checkBackOrigin = groundHit.point + Vector3.up * vaultCheckHeightOffset;
                 Vector3 directionBack = (hit.point - checkBackOrigin).normalized;
                 float distanceBack = Vector3.Distance(checkBackOrigin, hit.point);
@@ -275,12 +273,16 @@ public class PlayerRigidbodyMovement : MonoBehaviour
                 }
 
                 Vector3 targetPos = new Vector3(groundHit.point.x, transform.position.y, groundHit.point.z);
-                StartCoroutine(PerformVault(targetPos));
+                
+                // Určíme délku trvání podle toho, zda hráč zrovna běží nebo jde
+                float calculatedDuration = isSprinting ? (vaultDuration / vaultSprintSpeedMultiplier) : vaultDuration;
+
+                StartCoroutine(PerformVault(targetPos, calculatedDuration)); // <-- PŘEDÁVÁME UPRAVENÝ ČAS
             }
         }
     }
 
-    IEnumerator PerformVault(Vector3 targetPosition)
+    IEnumerator PerformVault(Vector3 targetPosition, float customDuration) // <-- PŘIJÍMÁ UPRAVENÝ ČAS
     {
         isVaulting = true;
         
@@ -295,9 +297,9 @@ public class PlayerRigidbodyMovement : MonoBehaviour
         moveDirection.y = 0; 
         Quaternion targetPlayerRotation = Quaternion.LookRotation(moveDirection);
 
-        while (elapsedTime < vaultDuration)
+        while (elapsedTime < customDuration) // <-- KONTROLA BĚŽÍ PODLE UPRAVENÉHO ČASU
         {
-            float t = elapsedTime / vaultDuration;
+            float t = elapsedTime / customDuration;
             float smoothT = Mathf.SmoothStep(0f, 1f, t);
 
             float newX = Mathf.Lerp(startPosition.x, targetPosition.x, smoothT);
@@ -307,7 +309,6 @@ public class PlayerRigidbodyMovement : MonoBehaviour
             
             transform.rotation = Quaternion.Slerp(startPlayerRotation, targetPlayerRotation, smoothT);
 
-            // Dočasný filmový náklon hlavy
             float leanAmount = Mathf.Sin(t * Mathf.PI) * vaultMaxLeanAngle;
             cameraHolder.localRotation = Quaternion.Euler(rotationX, 0, leanAmount);
             
@@ -322,7 +323,6 @@ public class PlayerRigidbodyMovement : MonoBehaviour
         capsuleCollider.enabled = true;
         rb.isKinematic = false;
         
-        // Synchronizace smoothing rotace na novou pozici po vaultu
         targetBodyRotation = transform.rotation; 
 
         isVaulting = false;

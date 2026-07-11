@@ -148,7 +148,7 @@ namespace VolFx
                 pass.Invoke(data._camera, data._buffer, _callApi);
                 _callApi.Blit(data._buffer, data._camera);
             }
-            
+            /*
             [Obsolete("This rendering path is for compatibility mode only (when Render Graph is disabled). Use Render Graph API instead.", false)]
             public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
             {
@@ -195,6 +195,7 @@ namespace VolFx
 #endif
                 }
             }
+            */
 #endif
             
 #if UNITY_LEGACY

@@ -491,6 +491,7 @@ GameObject:
   - component: {fileID: 2117106139040031721}
   - component: {fileID: 6896714499500417398}
   - component: {fileID: 1347551379956156291}
+  - component: {fileID: 5749055425306870851}
   - component: {fileID: 5290729527821001651}
   m_Layer: 0
   m_Name: Player
@@ -631,6 +632,21 @@ MonoBehaviour:
   animationTriggerName: UtriBryle
   animationDuration: 3
   blinkSpeed: 0.09
+--- !u!114 &5749055425306870851
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6967895936887504467}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b5ded644de7937441b1fd1cfa7ad5dda, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerInteract
+  interactRange: 3
+  playerCamera: {fileID: 8332961644670207549}
+  interactAction: {fileID: 1781555164194001046, guid: 052faaac586de48259a63d0c4782560b, type: 3}
 --- !u!95 &5290729527821001651
 Animator:
   serializedVersion: 7

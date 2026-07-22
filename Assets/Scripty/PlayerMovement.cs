@@ -46,7 +46,7 @@ public class PlayerRigidbodyMovement : MonoBehaviour
     public float vaultMaxHeight = 1.5f;
     public float vaultDuration = 0.4f;
     [Tooltip("Kolikrát RYCHLEJŠÍ bude přelézání, pokud hráč u toho sprintuje. Vyšší číslo = rychlejší vault.")]
-    public float vaultSprintSpeedMultiplier = 1.5f; // <-- NOVÁ PROMĚNNÁ
+    public float vaultSprintSpeedMultiplier = 1.5f;
     [Tooltip("Výška od země hráče, ze které se střílí Raycast dopředu.")]
     public float vaultCheckHeightOffset = 0.2f;
     [Tooltip("Jak hluboko za bod nárazu má systém koukat, aby našel zem pro dopad (tloušťka zdi + rezerva).")]
@@ -134,6 +134,22 @@ public class PlayerRigidbodyMovement : MonoBehaviour
         HandleMovement();
     }
 
+    /// <summary>
+    /// Vynutí novou rotaci hráče i vnitřní proměnné pro myš (např. při vylezení ze skrýše)
+    /// </summary>
+    public void SetPlayerRotation(Quaternion newRotation)
+    {
+        transform.rotation = newRotation;
+        targetBodyRotation = newRotation;
+
+        // Vynulujeme vertikální naklonění kamery nahoru/dolů
+        rotationX = 0f;
+        if (cameraHolder != null)
+        {
+            cameraHolder.localRotation = Quaternion.identity;
+        }
+    }
+
     void CheckGround()
     {
         isGrounded = Physics.Raycast(transform.position, Vector3.down, groundCheckDistance, groundLayer);
@@ -154,7 +170,11 @@ public class PlayerRigidbodyMovement : MonoBehaviour
         {
             targetBodyRotation *= Quaternion.Euler(0, lookInput.x * lookSpeed * 0.05f, 0);
 
-            cameraHolder.localRotation = Quaternion.Slerp(cameraHolder.localRotation, targetHolderRot, Time.deltaTime * cameraSmoothing);
+            if (cameraHolder != null)
+            {
+                cameraHolder.localRotation = Quaternion.Slerp(cameraHolder.localRotation, targetHolderRot, Time.deltaTime * cameraSmoothing);
+            }
+            
             transform.rotation = Quaternion.Slerp(transform.rotation, targetBodyRotation, Time.deltaTime * cameraSmoothing);
         }
     }
@@ -222,7 +242,7 @@ public class PlayerRigidbodyMovement : MonoBehaviour
 
     void HandleHeadbob()
     {
-        if (isVaulting) return; 
+        if (isVaulting || mainCamera == null) return; 
 
         Vector3 horizontalVelocity = new Vector3(rb.linearVelocity.x, 0, rb.linearVelocity.z);
 
@@ -274,15 +294,14 @@ public class PlayerRigidbodyMovement : MonoBehaviour
 
                 Vector3 targetPos = new Vector3(groundHit.point.x, transform.position.y, groundHit.point.z);
                 
-                // Určíme délku trvání podle toho, zda hráč zrovna běží nebo jde
                 float calculatedDuration = isSprinting ? (vaultDuration / vaultSprintSpeedMultiplier) : vaultDuration;
 
-                StartCoroutine(PerformVault(targetPos, calculatedDuration)); // <-- PŘEDÁVÁME UPRAVENÝ ČAS
+                StartCoroutine(PerformVault(targetPos, calculatedDuration));
             }
         }
     }
 
-    IEnumerator PerformVault(Vector3 targetPosition, float customDuration) // <-- PŘIJÍMÁ UPRAVENÝ ČAS
+    IEnumerator PerformVault(Vector3 targetPosition, float customDuration)
     {
         isVaulting = true;
         
@@ -297,7 +316,7 @@ public class PlayerRigidbodyMovement : MonoBehaviour
         moveDirection.y = 0; 
         Quaternion targetPlayerRotation = Quaternion.LookRotation(moveDirection);
 
-        while (elapsedTime < customDuration) // <-- KONTROLA BĚŽÍ PODLE UPRAVENÉHO ČASU
+        while (elapsedTime < customDuration)
         {
             float t = elapsedTime / customDuration;
             float smoothT = Mathf.SmoothStep(0f, 1f, t);
@@ -310,20 +329,20 @@ public class PlayerRigidbodyMovement : MonoBehaviour
             transform.rotation = Quaternion.Slerp(startPlayerRotation, targetPlayerRotation, smoothT);
 
             float leanAmount = Mathf.Sin(t * Mathf.PI) * vaultMaxLeanAngle;
-            cameraHolder.localRotation = Quaternion.Euler(rotationX, 0, leanAmount);
+            if (cameraHolder != null)
+            {
+                cameraHolder.localRotation = Quaternion.Euler(rotationX, 0, leanAmount);
+            }
             
             elapsedTime += Time.deltaTime;
             yield return null;
         }
 
         transform.position = targetPosition;
-        transform.rotation = targetPlayerRotation;
-        cameraHolder.localRotation = Quaternion.Euler(rotationX, 0, 0);
+        SetPlayerRotation(targetPlayerRotation);
         
         capsuleCollider.enabled = true;
         rb.isKinematic = false;
-        
-        targetBodyRotation = transform.rotation; 
 
         isVaulting = false;
         Debug.Log("[Vault] Hotovo!");

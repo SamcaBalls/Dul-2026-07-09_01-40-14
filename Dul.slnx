@@ -1,4 +1,6 @@
 ﻿<Solution>
+  <Project Path="Pixelation.Runtime.csproj" />
   <Project Path="Assembly-CSharp.csproj" />
+  <Project Path="Pixelation.Editor.csproj" />
   <Project Path="Assembly-CSharp-Editor.csproj" />
 </Solution>

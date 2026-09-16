@@ -9,6 +9,8 @@ public class GlassesCleaningSequence : MonoBehaviour
     [Header("Reference")]
     [SerializeField] private Animator playerAnimator;
     [SerializeField] private InputActionReference interactAction;
+    [SerializeField] private PlayerStats playerStats;
+
 
     [Header("Volume Config")]
     [SerializeField] private Volume depthVolume;   // Sem v Inspectoru přetáhneš DepthVolume
@@ -24,7 +26,7 @@ public class GlassesCleaningSequence : MonoBehaviour
     private DepthOfField depthOfField;
     private Vignette vignette;
     private ColorAdjustments colorAdjustments;
-    private bool isRunning = false;
+    public bool isRunning = false;
 
     private void Start()
     {
@@ -75,7 +77,7 @@ public class GlassesCleaningSequence : MonoBehaviour
 
     private void OnInteractPerformed(InputAction.CallbackContext context)
     {
-        if (!isRunning && depthOfField != null && vignette != null && colorAdjustments != null)
+        if (!isRunning && depthOfField != null && vignette != null && colorAdjustments != null && !playerStats.isHiding)
         {
             StartCoroutine(CleaningSequence());
         }

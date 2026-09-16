@@ -1,15 +1,39 @@
+using System;
 using System.Collections;
 using UnityEngine;
 
 public class HidingSpot : MonoBehaviour
 {
+    // Směry v lokálním nebo globálním prostoru skrýše
+    public enum Direction { North, East, South, West }
+
+    [System.Serializable]
+    public class DirectionData
+    {
+        public Direction direction;
+        public bool isEnabled = true;
+        public string enterAnimationTrigger = "North";
+        public string exitAnimationTrigger = "Exit";
+    }
+
     [Header("Data")]
     public PlayerStats playerStats; 
+
+    [Header("Směry a Animace")]
+    [Tooltip("Nastav povolené směry a příslušné názvy animací.")]
+    public DirectionData[] directionSettings = new DirectionData[4]
+    {
+        new DirectionData { direction = Direction.North, enterAnimationTrigger = "North", exitAnimationTrigger = "Exit" },
+        new DirectionData { direction = Direction.East, enterAnimationTrigger = "East", exitAnimationTrigger = "Exit" },
+        new DirectionData { direction = Direction.South, enterAnimationTrigger = "South", exitAnimationTrigger = "Exit" },
+        new DirectionData { direction = Direction.West, enterAnimationTrigger = "West", exitAnimationTrigger = "Exit" }
+    };
 
     [Header("Komponenty a Pozice")]
     public Animator hidingSpotAnimator; 
     public Transform cameraSocket;      
-    public Transform exitPosition;     
+    public Transform exitPosition; 
+    [SerializeField] private GlassesCleaningSequence bryle;    
 
     [Header("Kamera a CamHolder")]
     [Tooltip("Sem přetáhni v Inspectoru PŘESNĚ TU KAMERU, kterou používáš pro pohled hráče.")]
@@ -17,10 +41,6 @@ public class HidingSpot : MonoBehaviour
 
     [Tooltip("Sem přetáhni objekt CamHolder z hráče.")]
     public Transform defaultCamHolder; 
-
-    [Header("Názvy Animací")]
-    public string enterAnimationTrigger = "Enter";
-    public string exitAnimationTrigger = "Exit";
 
     [Header("Časování (v sekundách)")]
     public float enterAnimationDuration = 1.0f;
@@ -33,6 +53,9 @@ public class HidingSpot : MonoBehaviour
     private GameObject playerObject;
     private Rigidbody playerRb;
 
+    // Uložený směr, ze kterého hráč do skrýše vstoupil
+    private DirectionData currentActiveDirection;
+
     private void Awake()
     {
         if (playerStats != null)
@@ -44,6 +67,7 @@ public class HidingSpot : MonoBehaviour
     public void Interact(GameObject player)
     {
         if (isTransitioning) return;
+        if (bryle != null && bryle.isRunning) return;
 
         playerObject = player;
 
@@ -55,6 +79,18 @@ public class HidingSpot : MonoBehaviour
 
         if (!isFullyHidden)
         {
+            // Vypočítáme směr příchodu hráče
+            Direction detectedDirection = CalculateInteractionDirection(player.transform.position);
+            DirectionData data = GetDirectionData(detectedDirection);
+
+            // Pokud je daný směr zakázaný nebo nenastavený, interakci neprovedeme
+            if (data == null || !data.isEnabled)
+            {
+                Debug.LogWarning($"Interakce ze směru {detectedDirection} není povolená!");
+                return;
+            }
+
+            currentActiveDirection = data;
             StartCoroutine(HideRoutine());
         }
         else
@@ -92,10 +128,10 @@ public class HidingSpot : MonoBehaviour
             targetPlayerCamera.transform.localRotation = Quaternion.identity;
         }
 
-        // 3. Spustíme animaci vstupu
-        if (hidingSpotAnimator != null)
+        // 3. Spustíme animaci vstupu pro detekovaný směr
+        if (hidingSpotAnimator != null && currentActiveDirection != null)
         {
-            hidingSpotAnimator.SetTrigger(enterAnimationTrigger);
+            hidingSpotAnimator.SetTrigger(currentActiveDirection.enterAnimationTrigger);
         }
 
         yield return new WaitForSeconds(enterAnimationDuration);
@@ -108,10 +144,10 @@ public class HidingSpot : MonoBehaviour
     {
         isTransitioning = true;
 
-        // 1. Spustíme animaci výstupu
-        if (hidingSpotAnimator != null)
+        // 1. Spustíme animaci výstupu pro směr, ze kterého hráč vešel
+        if (hidingSpotAnimator != null && currentActiveDirection != null)
         {
-            hidingSpotAnimator.SetTrigger(exitAnimationTrigger);
+            hidingSpotAnimator.SetTrigger(currentActiveDirection.exitAnimationTrigger);
         }
 
         yield return new WaitForSeconds(exitAnimationDuration);
@@ -127,7 +163,6 @@ public class HidingSpot : MonoBehaviour
                 playerRb.rotation = exitPosition.rotation;
             }
 
-            // DŮLEŽITÉ: Předáme novou rotaci přímo do skriptu pohybu
             if (playerMovementScript != null)
             {
                 playerMovementScript.SetPlayerRotation(exitPosition.rotation);
@@ -174,5 +209,36 @@ public class HidingSpot : MonoBehaviour
         {
             playerStats.isHiding = false;
         }
+    }
+
+    /// <summary>
+    /// Vypočítá směr hráče vůči lokální rotaci skrýše.
+    /// Z/North = Dopředu (+Z), East = Doprava (+X), South = Dozadu (-Z), West = Doleva (-X)
+    /// </summary>
+    private Direction CalculateInteractionDirection(Vector3 playerPosition)
+    {
+        Vector3 dirToPlayer = (playerPosition - transform.position);
+        
+        // Převedeme vektor směřující k hráči do lokálního prostoru skrýše
+        Vector3 localDir = transform.InverseTransformDirection(dirToPlayer);
+        localDir.y = 0; // Ignorujeme výškový rozdíl
+
+        float angle = Vector3.SignedAngle(Vector3.forward, localDir, Vector3.up);
+
+        // Úhly: North (-45° až 45°), East (45° až 135°), South (135° až -135°), West (-135° až -45°)
+        if (angle >= -45f && angle < 45f) return Direction.North;
+        if (angle >= 45f && angle < 135f) return Direction.East;
+        if (angle >= -135f && angle < -45f) return Direction.West;
+        
+        return Direction.South;
+    }
+
+    private DirectionData GetDirectionData(Direction dir)
+    {
+        foreach (var data in directionSettings)
+        {
+            if (data.direction == dir) return data;
+        }
+        return null;
     }
 }

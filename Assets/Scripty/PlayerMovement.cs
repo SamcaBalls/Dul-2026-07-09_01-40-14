@@ -19,10 +19,12 @@ public class PlayerRigidbodyMovement : MonoBehaviour
     public float crouchSpeed = 1.0f;
 
     [Header("Nastavení kamery a pohledu")]
-    public Transform cameraHolder; 
-    public Transform mainCamera;    
+    public Transform cameraHolder;
+    public Transform mainCamera;
     public float lookSpeed = 2.0f;
     public float lookXLimit = 60.0f;
+    [Tooltip("Když je false, kamera se nehýbe (např. při otevřeném inventáři). Pohyb WASD funguje dál.")]
+    public bool CanLook = true;
 
     [Header("Plynulost pohledu (Sliding/Smoothing)")]
     [Tooltip("Jak rychle kamera klouže za myší. Nižší číslo = větší skluz (hladší), vyšší číslo = ostřejší reakce.")]
@@ -157,6 +159,7 @@ public class PlayerRigidbodyMovement : MonoBehaviour
 
     void HandleMouseLook()
     {
+        if (!CanLook) return;
         if (lookAction == null) return;
 
         Vector2 lookInput = lookAction.action.ReadValue<Vector2>();

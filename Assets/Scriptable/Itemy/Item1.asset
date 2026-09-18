@@ -13,6 +13,6 @@ MonoBehaviour:
   m_Name: Item1
   m_EditorClassIdentifier: Assembly-CSharp::ItemData
   itemName: Test1
-  itemIcon: {fileID: 10911, guid: 0000000000000000f000000000000000, type: 0}
+  itemIcon: {fileID: 10901, guid: 0000000000000000f000000000000000, type: 0}
   weight: 2
   inGamePrefab: {fileID: 7245637684393332182, guid: 324787ef4d1442f499cbc126e088d6b3, type: 3}

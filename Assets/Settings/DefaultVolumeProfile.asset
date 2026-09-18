@@ -189,13 +189,13 @@ MonoBehaviour:
   active: 1
   type:
     m_OverrideState: 1
-    m_Value: 0
+    m_Value: 9
   intensity:
     m_OverrideState: 1
-    m_Value: 0
+    m_Value: 1
   response:
     m_OverrideState: 1
-    m_Value: 0.8
+    m_Value: 0.939
   texture:
     m_OverrideState: 1
     m_Value: {fileID: 0}
@@ -468,6 +468,8 @@ MonoBehaviour:
   - {fileID: -6288072647309666549}
   - {fileID: 7518938298396184218}
   - {fileID: -1410297666881709256}
+  - {fileID: 3436034647073358077}
+  - {fileID: 7907315028691863464}
 --- !u!114 &853819529557874667
 MonoBehaviour:
   m_ObjectHideFlags: 3
@@ -778,6 +780,41 @@ MonoBehaviour:
   contribution:
     m_OverrideState: 1
     m_Value: 0
+--- !u!114 &3436034647073358077
+MonoBehaviour:
+  m_ObjectHideFlags: 3
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 772ef47f3fce34346bbb42fb4f5434b8, type: 3}
+  m_Name: PixelationVol
+  m_EditorClassIdentifier: Pixelation.Runtime::VolFx.PixelationVol
+  active: 1
+  m_Scale:
+    m_OverrideState: 1
+    m_Value: 0.988
+  m_Grid:
+    m_OverrideState: 1
+    m_Value: 1
+  m_Roundness:
+    m_OverrideState: 1
+    m_Value: 1
+  m_Color:
+    m_OverrideState: 1
+    m_Value: {r: 0, g: 0, b: 0, a: 1}
+    hdr: 0
+  m_Palette:
+    m_OverrideState: 1
+    m_Value: {fileID: 0}
+  m_Impact:
+    m_OverrideState: 1
+    m_Value: 1
+  m_Crisp:
+    m_OverrideState: 1
+    m_Value: 0
 --- !u!114 &3959858460715838825
 MonoBehaviour:
   m_ObjectHideFlags: 3
@@ -925,6 +962,46 @@ MonoBehaviour:
   scale:
     m_OverrideState: 1
     m_Value: 1
+--- !u!114 &7907315028691863464
+MonoBehaviour:
+  m_ObjectHideFlags: 3
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 850e16bd732c2154b94802d39fe26a45, type: 3}
+  m_Name: CRTEffectVolume
+  m_EditorClassIdentifier: Assembly-CSharp::CRTEffectVolume
+  active: 1
+  isActive:
+    m_OverrideState: 1
+    m_Value: 1
+  chromaticAberration:
+    m_OverrideState: 1
+    m_Value: 0.0333
+  screenJump:
+    m_OverrideState: 1
+    m_Value: 0.856
+  flickering:
+    m_OverrideState: 1
+    m_Value: 0.0737
+  scanlines:
+    m_OverrideState: 1
+    m_Value: 1
+  whiteNoise:
+    m_OverrideState: 1
+    m_Value: 1
+  monochrome:
+    m_OverrideState: 1
+    m_Value: 1
+  filmDirt:
+    m_OverrideState: 1
+    m_Value: 0
+  multipleGhost:
+    m_OverrideState: 1
+    m_Value: 0
 --- !u!114 &9001657382290151224
 MonoBehaviour:
   m_ObjectHideFlags: 3

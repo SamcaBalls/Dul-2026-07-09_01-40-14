@@ -129,7 +129,7 @@ MonoBehaviour:
   active: 1
   m_Scale:
     m_OverrideState: 1
-    m_Value: 0.94
+    m_Value: 0.96
   m_Grid:
     m_OverrideState: 1
     m_Value: 1

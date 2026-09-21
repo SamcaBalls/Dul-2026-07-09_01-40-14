@@ -45,6 +45,8 @@ public class HidingSpot : MonoBehaviour
     [Header("Časování (v sekundách)")]
     public float enterAnimationDuration = 1.0f;
     public float exitAnimationDuration = 1.0f;
+    [Tooltip("Jak dlouho hlava (kamera) plynule srovnává (lerpuje) na správnou rotaci po skončení výstupní animace.")]
+    public float headExitLerpDuration = 0.4f;
 
     private bool isTransitioning = false; 
     private bool isFullyHidden = false;   
@@ -103,10 +105,14 @@ public class HidingSpot : MonoBehaviour
     {
         isTransitioning = true;
 
-        if (playerStats != null) 
+        if (playerStats != null)
         {
             playerStats.isHiding = true;
         }
+
+        // Automaticky schováme předmět z ruky (sjede dolů).
+        if (PlayerEquipment.Instance != null)
+            PlayerEquipment.Instance.SetHidden(true);
 
         // 1. Deaktivujeme pohyb a fyziku
         if (playerMovementScript != null) playerMovementScript.enabled = false;
@@ -160,23 +166,43 @@ public class HidingSpot : MonoBehaviour
             if (playerRb != null)
             {
                 playerRb.position = exitPosition.position;
-                playerRb.rotation = exitPosition.rotation;
+                playerRb.rotation = Quaternion.Euler(0f, exitPosition.eulerAngles.y, 0f);
             }
 
             if (playerMovementScript != null)
             {
-                playerMovementScript.SetPlayerRotation(exitPosition.rotation);
+                playerMovementScript.SetPlayerRotation(Quaternion.Euler(0f, exitPosition.eulerAngles.y, 0f));
             }
             else
             {
-                playerObject.transform.rotation = exitPosition.rotation;
+                playerObject.transform.rotation = Quaternion.Euler(0f, exitPosition.eulerAngles.y, 0f);
             }
         }
 
-        // 3. Vrátíme kameru do CamHolderu
+        // 3. Vrátíme kameru do CamHolderu a plynule (lerp) srovnáme hlavu na správnou rotaci
         if (targetPlayerCamera != null && defaultCamHolder != null)
         {
-            targetPlayerCamera.transform.SetParent(defaultCamHolder);
+            // Připojíme kameru zpět, ale ZACHOVÁME její aktuální world pozici/rotaci z konce animace,
+            // aby nedošlo k okamžitému "cuknutí" pohledu.
+            targetPlayerCamera.transform.SetParent(defaultCamHolder, true);
+
+            Vector3 startLocalPos = targetPlayerCamera.transform.localPosition;
+            Quaternion startLocalRot = targetPlayerCamera.transform.localRotation;
+
+            // Cílem je lokální identita = hlava kouká rovně dopředu ve směru těla na ExitPosition.
+            float elapsed = 0f;
+            while (elapsed < headExitLerpDuration)
+            {
+                float t = Mathf.SmoothStep(0f, 1f, elapsed / headExitLerpDuration);
+
+                targetPlayerCamera.transform.localPosition = Vector3.Lerp(startLocalPos, Vector3.zero, t);
+                targetPlayerCamera.transform.localRotation = Quaternion.Slerp(startLocalRot, Quaternion.identity, t);
+
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+
+            // Přesné dorovnání na cílovou lokální pozici/rotaci
             targetPlayerCamera.transform.localPosition = Vector3.zero;
             targetPlayerCamera.transform.localRotation = Quaternion.identity;
         }
@@ -205,10 +231,14 @@ public class HidingSpot : MonoBehaviour
         isTransitioning = false;
         isFullyHidden = false;
 
-        if (playerStats != null) 
+        if (playerStats != null)
         {
             playerStats.isHiding = false;
         }
+
+        // Po vylezení ze skrýše zase vytáhneme předmět z aktivní kapsy (vyjede nahoru).
+        if (PlayerEquipment.Instance != null)
+            PlayerEquipment.Instance.SetHidden(false);
     }
 
     /// <summary>

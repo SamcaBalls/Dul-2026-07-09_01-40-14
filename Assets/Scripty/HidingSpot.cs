@@ -66,16 +66,28 @@ public class HidingSpot : MonoBehaviour
         }
     }
 
+    private void Start()
+    {
+        // Reference na hráče si dohledáme hned při startu (hráče najdeme sami).
+        ResolvePlayerReferences(null);
+
+        // Vynulujeme isHiding (ScriptableObject si drží hodnotu mezi spuštěními).
+        if (playerStats != null)
+            playerStats.isHiding = false;
+    }
+
     public void Interact(GameObject player)
     {
         if (isTransitioning) return;
-        if (bryle != null && bryle.isRunning) return;
 
         playerObject = player;
 
-        playerMovementScript = player.GetComponent<PlayerRigidbodyMovement>();
-        if (playerMovementScript == null) 
-            playerMovementScript = player.GetComponentInChildren<PlayerRigidbodyMovement>();
+        // Reference na hráče (kamera, CamHolder, data) si dohledáme samy –
+        // nemusí se ručně tahat do každé skrýše. Ruční nastavení má přednost.
+        ResolvePlayerReferences(player);
+
+        // Když zrovna běží čištění brýlí, do skrýše nelezeme.
+        if (bryle != null && bryle.isRunning) return;
 
         playerRb = player.GetComponent<Rigidbody>();
 
@@ -99,6 +111,62 @@ public class HidingSpot : MonoBehaviour
         {
             StartCoroutine(ShowRoutine());
         }
+    }
+
+    // Automaticky dohledá reference na hráče, aby se nemusely tahat do každé skrýše ručně.
+    // Vždy respektuje ručně přiřazené hodnoty – dohledává jen to, co je prázdné.
+    // Parametr player může být null (např. při startu) – hráče pak najdeme sami.
+    private void ResolvePlayerReferences(GameObject player)
+    {
+        // 1) Skript pohybu hráče: z předaného objektu (i rodičů/dětí), jinak jediný ve scéně.
+        if (playerMovementScript == null)
+        {
+            if (player != null)
+            {
+                playerMovementScript = player.GetComponentInChildren<PlayerRigidbodyMovement>();
+                if (playerMovementScript == null)
+                    playerMovementScript = player.GetComponentInParent<PlayerRigidbodyMovement>();
+            }
+            if (playerMovementScript == null)
+                playerMovementScript = FindAnyObjectByType<PlayerRigidbodyMovement>();
+        }
+
+        // 2) CamHolder bereme přímo z movement skriptu (tam ho hráč má nastavený).
+        if (defaultCamHolder == null && playerMovementScript != null)
+            defaultCamHolder = playerMovementScript.cameraHolder;
+
+        // 3) Kamera: nejspolehlivěji z PlayerInteract.playerCamera – tam hráč má tu pravou
+        //    kameru (mainCamera v movement skriptu totiž míří na CamHolder, ne na Camera).
+        if (targetPlayerCamera == null)
+        {
+            PlayerInteract interact = playerMovementScript != null
+                ? playerMovementScript.GetComponent<PlayerInteract>()
+                : FindAnyObjectByType<PlayerInteract>();
+            if (interact != null)
+                targetPlayerCamera = interact.playerCamera;
+        }
+
+        // Zálohy: kamera pod CamHolderem, pod mainCamera, kdekoli u hráče, nebo hlavní kamera scény.
+        if (targetPlayerCamera == null && defaultCamHolder != null)
+            targetPlayerCamera = defaultCamHolder.GetComponentInChildren<Camera>();
+        if (targetPlayerCamera == null && playerMovementScript != null && playerMovementScript.mainCamera != null)
+            targetPlayerCamera = playerMovementScript.mainCamera.GetComponentInChildren<Camera>();
+        if (targetPlayerCamera == null)
+            targetPlayerCamera = Camera.main;
+
+        // 4) Sdílená data hráče (ScriptableObject) vezmeme z InventoryManageru.
+        if (playerStats == null && InventoryManager.Instance != null)
+            playerStats = InventoryManager.Instance.playerStats;
+
+        // 5) Sekvence čištění brýlí (blokuje interakci, když běží) – ve scéně je jen jedna.
+        if (bryle == null)
+            bryle = FindAnyObjectByType<GlassesCleaningSequence>();
+
+        // Kdyby se něco nenašlo, dáme jasně vědět (jinak by skrýš tiše nefungovala).
+        if (targetPlayerCamera == null)
+            Debug.LogWarning("[HidingSpot] Nenašel jsem kameru hráče. Přiřaď ji ručně do 'Target Player Camera', nebo do PlayerInteract.playerCamera.", this);
+        if (defaultCamHolder == null)
+            Debug.LogWarning("[HidingSpot] Nenašel jsem CamHolder hráče. Přiřaď ho ručně do 'Default Cam Holder', nebo nastav 'cameraHolder' v PlayerRigidbodyMovement.", this);
     }
 
     private IEnumerator HideRoutine()

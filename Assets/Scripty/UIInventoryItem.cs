@@ -3,7 +3,7 @@ using UnityEngine.UI;
 using UnityEngine.EventSystems;
 
 [RequireComponent(typeof(CanvasGroup))]
-public class UIInventoryItem : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
+public class UIInventoryItem : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler, IPointerEnterHandler, IPointerExitHandler
 {
     public ItemData itemData;
     [HideInInspector] public int currentPocketIndex = 0; // 0 = v batohu, 1/2 = v kapse
@@ -16,6 +16,11 @@ public class UIInventoryItem : MonoBehaviour, IBeginDragHandler, IDragHandler, I
     private Transform originalParent;
     private Vector2 originalPosition;
     private Quaternion originalRotation;
+
+    // Kam item patřil, než ho hráč zvedl – čte UIDropZone při výměně (swap) itemů v kapse.
+    public Transform OriginalParent => originalParent;
+    public Vector2 OriginalPosition => originalPosition;
+    public Quaternion OriginalRotation => originalRotation;
 
     private void Awake()
     {
@@ -65,7 +70,7 @@ public class UIInventoryItem : MonoBehaviour, IBeginDragHandler, IDragHandler, I
         canvasGroup.blocksRaycasts = true; // Zase zapneme
         canvasGroup.alpha = 1f;
 
-        // Pokud má item na konci tahu stále jako parenta hlavní Canvas, 
+        // Pokud má item na konci tahu stále jako parenta hlavní Canvas,
         // znamená to, že DropZone ho NEPŘIJALA (byl puštěn mimo, nebo je kapsa plná)
         if (transform.parent == parentCanvas.transform)
         {
@@ -74,5 +79,19 @@ public class UIInventoryItem : MonoBehaviour, IBeginDragHandler, IDragHandler, I
             rectTransform.anchoredPosition = originalPosition;
             rectTransform.localRotation = originalRotation;
         }
+    }
+
+    // Kursor najel na item → nahlásíme jeho jméno do textu.
+    public void OnPointerEnter(PointerEventData eventData)
+    {
+        if (ItemHoverName.Instance != null)
+            ItemHoverName.Instance.SetHovered(this, true);
+    }
+
+    // Kursor sjel z itemu → text se vyprázdní.
+    public void OnPointerExit(PointerEventData eventData)
+    {
+        if (ItemHoverName.Instance != null)
+            ItemHoverName.Instance.SetHovered(this, false);
     }
 }

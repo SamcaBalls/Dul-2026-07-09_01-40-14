@@ -45,6 +45,8 @@ public class HidingSpot : MonoBehaviour
     [Header("Časování (v sekundách)")]
     public float enterAnimationDuration = 1.0f;
     public float exitAnimationDuration = 1.0f;
+    [Tooltip("Jak dlouho hlava (kamera) plynule srovnává (lerpuje) na správnou rotaci po skončení výstupní animace.")]
+    public float headExitLerpDuration = 0.4f;
 
     private bool isTransitioning = false; 
     private bool isFullyHidden = false;   
@@ -64,16 +66,28 @@ public class HidingSpot : MonoBehaviour
         }
     }
 
+    private void Start()
+    {
+        // Reference na hráče si dohledáme hned při startu (hráče najdeme sami).
+        ResolvePlayerReferences(null);
+
+        // Vynulujeme isHiding (ScriptableObject si drží hodnotu mezi spuštěními).
+        if (playerStats != null)
+            playerStats.isHiding = false;
+    }
+
     public void Interact(GameObject player)
     {
         if (isTransitioning) return;
-        if (bryle != null && bryle.isRunning) return;
 
         playerObject = player;
 
-        playerMovementScript = player.GetComponent<PlayerRigidbodyMovement>();
-        if (playerMovementScript == null) 
-            playerMovementScript = player.GetComponentInChildren<PlayerRigidbodyMovement>();
+        // Reference na hráče (kamera, CamHolder, data) si dohledáme samy –
+        // nemusí se ručně tahat do každé skrýše. Ruční nastavení má přednost.
+        ResolvePlayerReferences(player);
+
+        // Když zrovna běží čištění brýlí, do skrýše nelezeme.
+        if (bryle != null && bryle.isRunning) return;
 
         playerRb = player.GetComponent<Rigidbody>();
 
@@ -99,14 +113,74 @@ public class HidingSpot : MonoBehaviour
         }
     }
 
+    // Automaticky dohledá reference na hráče, aby se nemusely tahat do každé skrýše ručně.
+    // Vždy respektuje ručně přiřazené hodnoty – dohledává jen to, co je prázdné.
+    // Parametr player může být null (např. při startu) – hráče pak najdeme sami.
+    private void ResolvePlayerReferences(GameObject player)
+    {
+        // 1) Skript pohybu hráče: z předaného objektu (i rodičů/dětí), jinak jediný ve scéně.
+        if (playerMovementScript == null)
+        {
+            if (player != null)
+            {
+                playerMovementScript = player.GetComponentInChildren<PlayerRigidbodyMovement>();
+                if (playerMovementScript == null)
+                    playerMovementScript = player.GetComponentInParent<PlayerRigidbodyMovement>();
+            }
+            if (playerMovementScript == null)
+                playerMovementScript = FindAnyObjectByType<PlayerRigidbodyMovement>();
+        }
+
+        // 2) CamHolder bereme přímo z movement skriptu (tam ho hráč má nastavený).
+        if (defaultCamHolder == null && playerMovementScript != null)
+            defaultCamHolder = playerMovementScript.cameraHolder;
+
+        // 3) Kamera: nejspolehlivěji z PlayerInteract.playerCamera – tam hráč má tu pravou
+        //    kameru (mainCamera v movement skriptu totiž míří na CamHolder, ne na Camera).
+        if (targetPlayerCamera == null)
+        {
+            PlayerInteract interact = playerMovementScript != null
+                ? playerMovementScript.GetComponent<PlayerInteract>()
+                : FindAnyObjectByType<PlayerInteract>();
+            if (interact != null)
+                targetPlayerCamera = interact.playerCamera;
+        }
+
+        // Zálohy: kamera pod CamHolderem, pod mainCamera, kdekoli u hráče, nebo hlavní kamera scény.
+        if (targetPlayerCamera == null && defaultCamHolder != null)
+            targetPlayerCamera = defaultCamHolder.GetComponentInChildren<Camera>();
+        if (targetPlayerCamera == null && playerMovementScript != null && playerMovementScript.mainCamera != null)
+            targetPlayerCamera = playerMovementScript.mainCamera.GetComponentInChildren<Camera>();
+        if (targetPlayerCamera == null)
+            targetPlayerCamera = Camera.main;
+
+        // 4) Sdílená data hráče (ScriptableObject) vezmeme z InventoryManageru.
+        if (playerStats == null && InventoryManager.Instance != null)
+            playerStats = InventoryManager.Instance.playerStats;
+
+        // 5) Sekvence čištění brýlí (blokuje interakci, když běží) – ve scéně je jen jedna.
+        if (bryle == null)
+            bryle = FindAnyObjectByType<GlassesCleaningSequence>();
+
+        // Kdyby se něco nenašlo, dáme jasně vědět (jinak by skrýš tiše nefungovala).
+        if (targetPlayerCamera == null)
+            Debug.LogWarning("[HidingSpot] Nenašel jsem kameru hráče. Přiřaď ji ručně do 'Target Player Camera', nebo do PlayerInteract.playerCamera.", this);
+        if (defaultCamHolder == null)
+            Debug.LogWarning("[HidingSpot] Nenašel jsem CamHolder hráče. Přiřaď ho ručně do 'Default Cam Holder', nebo nastav 'cameraHolder' v PlayerRigidbodyMovement.", this);
+    }
+
     private IEnumerator HideRoutine()
     {
         isTransitioning = true;
 
-        if (playerStats != null) 
+        if (playerStats != null)
         {
             playerStats.isHiding = true;
         }
+
+        // Automaticky schováme předmět z ruky (sjede dolů).
+        if (PlayerEquipment.Instance != null)
+            PlayerEquipment.Instance.SetHidden(true);
 
         // 1. Deaktivujeme pohyb a fyziku
         if (playerMovementScript != null) playerMovementScript.enabled = false;
@@ -160,23 +234,43 @@ public class HidingSpot : MonoBehaviour
             if (playerRb != null)
             {
                 playerRb.position = exitPosition.position;
-                playerRb.rotation = exitPosition.rotation;
+                playerRb.rotation = Quaternion.Euler(0f, exitPosition.eulerAngles.y, 0f);
             }
 
             if (playerMovementScript != null)
             {
-                playerMovementScript.SetPlayerRotation(exitPosition.rotation);
+                playerMovementScript.SetPlayerRotation(Quaternion.Euler(0f, exitPosition.eulerAngles.y, 0f));
             }
             else
             {
-                playerObject.transform.rotation = exitPosition.rotation;
+                playerObject.transform.rotation = Quaternion.Euler(0f, exitPosition.eulerAngles.y, 0f);
             }
         }
 
-        // 3. Vrátíme kameru do CamHolderu
+        // 3. Vrátíme kameru do CamHolderu a plynule (lerp) srovnáme hlavu na správnou rotaci
         if (targetPlayerCamera != null && defaultCamHolder != null)
         {
-            targetPlayerCamera.transform.SetParent(defaultCamHolder);
+            // Připojíme kameru zpět, ale ZACHOVÁME její aktuální world pozici/rotaci z konce animace,
+            // aby nedošlo k okamžitému "cuknutí" pohledu.
+            targetPlayerCamera.transform.SetParent(defaultCamHolder, true);
+
+            Vector3 startLocalPos = targetPlayerCamera.transform.localPosition;
+            Quaternion startLocalRot = targetPlayerCamera.transform.localRotation;
+
+            // Cílem je lokální identita = hlava kouká rovně dopředu ve směru těla na ExitPosition.
+            float elapsed = 0f;
+            while (elapsed < headExitLerpDuration)
+            {
+                float t = Mathf.SmoothStep(0f, 1f, elapsed / headExitLerpDuration);
+
+                targetPlayerCamera.transform.localPosition = Vector3.Lerp(startLocalPos, Vector3.zero, t);
+                targetPlayerCamera.transform.localRotation = Quaternion.Slerp(startLocalRot, Quaternion.identity, t);
+
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+
+            // Přesné dorovnání na cílovou lokální pozici/rotaci
             targetPlayerCamera.transform.localPosition = Vector3.zero;
             targetPlayerCamera.transform.localRotation = Quaternion.identity;
         }
@@ -205,10 +299,14 @@ public class HidingSpot : MonoBehaviour
         isTransitioning = false;
         isFullyHidden = false;
 
-        if (playerStats != null) 
+        if (playerStats != null)
         {
             playerStats.isHiding = false;
         }
+
+        // Po vylezení ze skrýše zase vytáhneme předmět z aktivní kapsy (vyjede nahoru).
+        if (PlayerEquipment.Instance != null)
+            PlayerEquipment.Instance.SetHidden(false);
     }
 
     /// <summary>

@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ac175af97e825d740a716df283ba2707, type: 3}
   m_Name: Item1
   m_EditorClassIdentifier: Assembly-CSharp::ItemData
-  itemName: Test1
-  itemIcon: {fileID: 10901, guid: 0000000000000000f000000000000000, type: 0}
+  itemName: Sekyra
+  itemIcon: {fileID: 10911, guid: 0000000000000000f000000000000000, type: 0}
   weight: 2
-  inGamePrefab: {fileID: 7245637684393332182, guid: 324787ef4d1442f499cbc126e088d6b3, type: 3}
+  inGamePrefab: {fileID: 5261463872022289932, guid: dcf60a1b7e1feb24a9f24ae023fd6305, type: 3}

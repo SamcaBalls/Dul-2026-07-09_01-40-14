@@ -31,6 +31,7 @@
 - Use akce: **dvě** (primární LMB, sekundární RMB), item nemusí mít žádnou.
 - Draw: **ponechat procedurální slide** + přidat **volitelný Draw klip**.
 - Architektura: **komponenta na itemu** (`HeldItemAnimator`), ne konfigurace v `ItemData`. Item je samostatný, `PlayerEquipment` zůstává štíhlý.
+- Vstup: **`InputActionReference`** (konzistentní s Q/E), nadrátuje uživatel v Inspectoru — kód reference nenastaví (viz projektová paměť o YAML wiring).
 
 ## Architektura
 
@@ -78,12 +79,13 @@ Sedí na child modelu itemu.
 
 ## Změny v `PlayerEquipment.cs`
 
-- **Vstup LMB/RMB:** číst přímo `Mouse.current.leftButton.wasPressedThisFrame` / `rightButton.wasPressedThisFrame` (`using UnityEngine.InputSystem`). Důvod: podle projektové paměti je ruční drátování `InputActionReference` přes YAML nespolehlivé; přímé čtení myši nevyžaduje žádné wiring v Inspectoru. (Ošetřit `Mouse.current != null`.)
+- **Vstup LMB/RMB:** dva nové `InputActionReference` fieldy — `primaryUseAction` (levé tlačítko) a `secondaryUseAction` (pravé tlačítko). Konzistentní s existujícím vzorem (`pocket1Action`/`pocket2Action`/`interactAction`). Enable/Disable v `OnEnable`/`OnDisable` stejně jako u ostatních akcí. Kontrola stisku přes `action.WasPressedThisFrame()` (ošetřit null).
+  - **Pozor (projektová paměť):** kód tyto reference **nenadrátuje** — `InputActionReference` nejde spolehlivě nastavit přes YAML (fileID hash není reprodukovatelný). Uživatel je nadrátuje sám v Inspectoru na `PlayerEquipment` a odpovídající akce (Use Primary / Use Secondary) si vytvoří v Input Actions assetu. Viz sekce Unity-side setup.
 - **Cache:** nové privátní pole `HeldItemAnimator currentHeldAnimator`.
 - V `SwitchHeldItemRoutine` po `Instantiate`: `currentHeldAnimator = currentHeldObject.GetComponentInChildren<HeldItemAnimator>();`, pak zavolat `currentHeldAnimator?.PlayDraw()` **těsně před** `yield return AnimateHolster(0f)`, aby se Draw klip překrýval s vyjížděním nahoru (ne až po něm). Při zničení objektu nastavit `currentHeldAnimator = null`.
 - V `Update` (uvnitř bloku `if (currentHeldObject != null)`), s podmínkami `!isHidden && switchRoutine == null && currentHeldAnimator != null`:
-  - `Mouse.current.leftButton.wasPressedThisFrame` → `currentHeldAnimator.TryPrimaryUse()`
-  - `Mouse.current.rightButton.wasPressedThisFrame` → `currentHeldAnimator.TrySecondaryUse()`
+  - `primaryUseAction != null && primaryUseAction.action.WasPressedThisFrame()` → `currentHeldAnimator.TryPrimaryUse()`
+  - `secondaryUseAction != null && secondaryUseAction.action.WasPressedThisFrame()` → `currentHeldAnimator.TrySecondaryUse()`
 
 **Gating (kdy use NEjde):** ve skrýši (`isHidden`), během přepínání/vytahování (`switchRoutine != null`), když item nemá `HeldItemAnimator`, a během cooldownu (řeší komponenta).
 
@@ -96,6 +98,8 @@ Toto udělá uživatel v editoru; kód to nevytvoří:
 3. Controller: stav `Idle` (default). Triggery `Draw`, `UsePrimary`, `UseSecondary`, každý přechod do příslušného stavu a zpět do `Idle`. **Apply Root Motion = OFF.**
 4. Nakeyovat klipy (Unity Animation okno nebo import FBX z Blenderu).
 5. Na `Model` přidat komponentu `HeldItemAnimator`, vyplnit `animator` a jména triggerů (prázdné = akci nemá). Volitelně navěsit `onPrimaryUse`.
+6. **Input Actions asset:** vytvořit dvě akce — např. `UsePrimary` (binding: levé tlačítko myši) a `UseSecondary` (binding: pravé tlačítko myši).
+7. **Wiring na `PlayerEquipment`:** v Inspectoru přetáhnout tyto `InputActionReference` do polí `primaryUseAction` a `secondaryUseAction`. (Kód to nenadrátuje — nutné ručně.)
 
 ## Testování
 

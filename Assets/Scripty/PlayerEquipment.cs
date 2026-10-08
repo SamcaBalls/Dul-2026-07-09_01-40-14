@@ -12,6 +12,8 @@ public class PlayerEquipment : MonoBehaviour
     [Header("Input System")]
     [SerializeField] private InputActionReference pocket1Action; // Q – Kapsa 1
     [SerializeField] private InputActionReference pocket2Action; // E – Kapsa 2
+    [SerializeField] private InputActionReference primaryUseAction;   // Levé tlačítko – primární použití
+    [SerializeField] private InputActionReference secondaryUseAction; // Pravé tlačítko – sekundární použití
 
     [Header("Houpání drženého předmětu (Bob)")]
     [Tooltip("Zapne jemné houpání předmětu v ruce (idle bob).")]
@@ -25,11 +27,29 @@ public class PlayerEquipment : MonoBehaviour
     [Tooltip("Jemné natočení předmětu během houpání (ve stupních).")]
     [SerializeField] private float bobRotationAmplitude = 1.2f;
 
+    [Header("Sway (zaostávání předmětu při otáčení pohledu)")]
+    [Tooltip("Zapne jemné zaostávání předmětu při otáčení pohledu.")]
+    [SerializeField] private bool swayEnabled = true;
+    [Tooltip("Síla zaostávání v poloze. Vyšší = předmět víc ujede stranou při otáčení.")]
+    [SerializeField] private float swayPositionAmount = 0.02f;
+    [Tooltip("Síla naklonění předmětu při otáčení.")]
+    [SerializeField] private float swayRotationAmount = 4f;
+    [Tooltip("Jak rychle se sway vrací do klidu / dohání pohled. Vyšší = svižnější.")]
+    [SerializeField] private float swaySmoothing = 8f;
+    [Tooltip("Maximální posun swaye (v metrech) – ořez při rychlém otáčení.")]
+    [SerializeField] private float swayMaxOffset = 0.05f;
+    [Tooltip("Maximální náklon swaye (ve stupních) – ořez při rychlém otáčení.")]
+    [SerializeField] private float swayMaxAngle = 8f;
+
     [Header("Vytažení / schování (Draw & Holster)")]
     [Tooltip("O kolik metrů předmět sjede dolů, když se schovává (mimo záběr).")]
     [SerializeField] private float holsterDistance = 0.5f;
     [Tooltip("Jak dlouho (v sekundách) trvá vytažení nahoru / schování dolů.")]
     [SerializeField] private float holsterDuration = 0.2f;
+
+    [Header("Házení")]
+    [Tooltip("Odkud se počítá pozice a směr hodu (obvykle kamera hráče). Prázdné = Camera.main.")]
+    [SerializeField] private Transform throwOrigin;
 
     // Uložené předměty v kapsách
     private ItemData pocket1Data;
@@ -38,7 +58,14 @@ public class PlayerEquipment : MonoBehaviour
     // 0 = nic nedrží, 1 = drží předmět z Kapsy 1 (Q), 2 = drží předmět z Kapsy 2 (E)
     private int activePocket = 0;
     private GameObject currentHeldObject; // Aktuálně vytvořený 3D/2D model v ruce
+    private HeldItemAnimator currentHeldAnimator; // Animátor klipů aktuálně drženého itemu (může být null)
     private float bobTimer = 0f; // Čas pro výpočet houpání drženého předmětu
+
+    // Sway: zaostávání předmětu podle změny rotace pohledu (handSocket) mezi snímky.
+    private Quaternion lastSocketRotation;          // world rotace handSocketu z minulého snímku
+    private bool hasLastSocketRotation = false;     // false = ještě nemáme referenci (přeskočíme první snímek)
+    private Vector3 swayPositionOffset = Vector3.zero;
+    private Vector3 swayRotationOffset = Vector3.zero; // (pitch, yaw, roll) ve stupních
 
     // 0 = plně vytažený (klidová pozice), 1 = schovaný dole mimo záběr
     private float holsterAmount = 0f;
@@ -55,12 +82,16 @@ public class PlayerEquipment : MonoBehaviour
     {
         if (pocket1Action != null) pocket1Action.action.Enable();
         if (pocket2Action != null) pocket2Action.action.Enable();
+        if (primaryUseAction != null) primaryUseAction.action.Enable();
+        if (secondaryUseAction != null) secondaryUseAction.action.Enable();
     }
 
     private void OnDisable()
     {
         if (pocket1Action != null) pocket1Action.action.Disable();
         if (pocket2Action != null) pocket2Action.action.Disable();
+        if (primaryUseAction != null) primaryUseAction.action.Disable();
+        if (secondaryUseAction != null) secondaryUseAction.action.Disable();
     }
 
     private void Update()
@@ -86,8 +117,63 @@ public class PlayerEquipment : MonoBehaviour
             if (bobEnabled)
                 bobTimer += Time.deltaTime * bobFrequency * Mathf.PI * 2f;
 
+            // Použití drženého itemu – jen když není schovaný a zrovna neprobíhá přepínání/vytahování.
+            if (!isHidden && switchRoutine == null && currentHeldAnimator != null)
+            {
+                if (primaryUseAction != null && primaryUseAction.action.WasPressedThisFrame())
+                    currentHeldAnimator.TryPrimaryUse();
+
+                if (secondaryUseAction != null && secondaryUseAction.action.WasPressedThisFrame())
+                    currentHeldAnimator.TrySecondaryUse();
+            }
+
+            UpdateSway();
             ApplyHeldItemTransform();
         }
+    }
+
+    // Spočítá jemné zaostávání předmětu podle toho, jak rychle se otáčí pohled (world rotace handSocketu).
+    // Nepotřebuje žádnou InputActionReference – čte přímo změnu rotace mezi snímky.
+    private void UpdateSway()
+    {
+        Vector3 targetPos = Vector3.zero;
+        Vector3 targetRot = Vector3.zero;
+
+        if (swayEnabled && handSocket != null && Time.deltaTime > 0f)
+        {
+            if (hasLastSocketRotation)
+            {
+                // O kolik stupňů se pohled otočil za tento snímek (yaw = do stran, pitch = nahoru/dolů).
+                Quaternion delta = Quaternion.Inverse(lastSocketRotation) * handSocket.rotation;
+                Vector3 e = delta.eulerAngles;
+                float dPitch = Mathf.DeltaAngle(0f, e.x);
+                float dYaw = Mathf.DeltaAngle(0f, e.y);
+
+                // Úhlová rychlost (stupně/s) → nezávislé na počtu snímků za sekundu.
+                float yawVel = dYaw / Time.deltaTime;
+                float pitchVel = dPitch / Time.deltaTime;
+
+                // Předmět „zaostává" = jde opačným směrem než pohled, s ořezem při rychlém otáčení.
+                targetPos.x = Mathf.Clamp(-yawVel * swayPositionAmount * 0.01f, -swayMaxOffset, swayMaxOffset);
+                targetPos.y = Mathf.Clamp(pitchVel * swayPositionAmount * 0.01f, -swayMaxOffset, swayMaxOffset);
+
+                targetRot.x = Mathf.Clamp(pitchVel * swayRotationAmount * 0.01f, -swayMaxAngle, swayMaxAngle);
+                targetRot.y = Mathf.Clamp(-yawVel * swayRotationAmount * 0.01f, -swayMaxAngle, swayMaxAngle);
+                targetRot.z = Mathf.Clamp(-yawVel * swayRotationAmount * 0.01f, -swayMaxAngle, swayMaxAngle); // jemný „bank" do zatáčky
+            }
+
+            lastSocketRotation = handSocket.rotation;
+            hasLastSocketRotation = true;
+        }
+        else
+        {
+            hasLastSocketRotation = false;
+        }
+
+        // Plynulé dohánění / návrat do klidu (nezávislé na FPS).
+        float t = 1f - Mathf.Exp(-swaySmoothing * Time.deltaTime);
+        swayPositionOffset = Vector3.Lerp(swayPositionOffset, targetPos, t);
+        swayRotationOffset = Vector3.Lerp(swayRotationOffset, targetRot, t);
     }
 
     // Nastaví lokální pozici/rotaci předmětu v ruce = jemné houpání (bob) + posun při schování (holster).
@@ -107,8 +193,12 @@ public class PlayerEquipment : MonoBehaviour
         // Holster: 0 = klidová pozice, 1 = sjetý dolů o holsterDistance (plynule přes SmoothStep).
         float slide = Mathf.SmoothStep(0f, 1f, holsterAmount) * holsterDistance;
 
-        currentHeldObject.transform.localPosition = new Vector3(bobX, bobY - slide, 0f);
-        currentHeldObject.transform.localRotation = Quaternion.Euler(tilt, 0f, tilt * 0.5f);
+        // Bob (houpání) + sway (zaostávání při otáčení) se sečtou.
+        currentHeldObject.transform.localPosition = new Vector3(bobX, bobY - slide, 0f) + swayPositionOffset;
+        currentHeldObject.transform.localRotation = Quaternion.Euler(
+            tilt + swayRotationOffset.x,
+            swayRotationOffset.y,
+            tilt * 0.5f + swayRotationOffset.z);
     }
 
     // Volá se z UI při vložení itemu do kapsy
@@ -164,6 +254,55 @@ public class PlayerEquipment : MonoBehaviour
         RefreshHeldItem();
     }
 
+    // Hodí aktuálně držený item do světa: spawne worldPrefab před kamerou, pošle ho
+    // dopředu, item spotřebuje (ubere z kapsy i inventáře) a vyprázdní ruku.
+    // Vrací spawnutý objekt (nebo null, když se hodit nedá), ať si volající dořeší
+    // navazující stav (např. přenos svícení glowsticku).
+    public GameObject ThrowActiveHeldItem(float force, float up)
+    {
+        // Hodit jde jen usazený předmět mimo skrýš (ne během vytahování/schovávání).
+        if (isHidden || switchRoutine != null || currentHeldObject == null) return null;
+
+        ItemData data = GetActiveData();
+        if (data == null) return null;
+
+        GameObject prefab = data.worldPrefab != null ? data.worldPrefab : data.inGamePrefab;
+        if (prefab == null) return null;
+
+        Transform origin = throwOrigin != null
+            ? throwOrigin
+            : (Camera.main != null ? Camera.main.transform : null);
+        if (origin == null) return null;
+
+        // Spawn kousek před kamerou, ať objekt nevznikne uvnitř hráče.
+        Vector3 spawnPos = origin.position + origin.forward * 0.5f;
+        GameObject obj = Instantiate(prefab, spawnPos, origin.rotation);
+
+        // Aby šel odhozený item zase sebrat.
+        WorldItem worldItem = obj.GetComponent<WorldItem>();
+        if (worldItem == null) worldItem = obj.AddComponent<WorldItem>();
+        worldItem.itemData = data;
+
+        // Impulz dopředu + lehký oblouček.
+        Rigidbody rb = obj.GetComponent<Rigidbody>();
+        if (rb != null)
+            rb.AddForce(origin.forward * force + Vector3.up * up, ForceMode.VelocityChange);
+
+        // Item spotřebujeme z inventáře (ubere váhu + zničí UI prvek kapsy).
+        if (InventoryManager.Instance != null)
+            InventoryManager.Instance.RemovePocketItem(activePocket);
+
+        // Okamžité vyprázdnění ruky (bez holster animace) – item z kapsy zmizel.
+        Destroy(currentHeldObject);
+        currentHeldObject = null;
+        currentHeldAnimator = null;
+
+        if (activePocket == 1) pocket1Data = null;
+        else if (activePocket == 2) pocket2Data = null;
+
+        return obj;
+    }
+
     // Item, který má být právě v ruce (podle aktivní kapsy).
     private ItemData GetActiveData()
     {
@@ -190,6 +329,7 @@ public class PlayerEquipment : MonoBehaviour
             yield return AnimateHolster(1f);
             Destroy(currentHeldObject);
             currentHeldObject = null;
+            currentHeldAnimator = null;
         }
 
         // 2) Když má nový item model, vytvoří se dole a vyjede nahoru (přijede zespoda).
@@ -197,10 +337,17 @@ public class PlayerEquipment : MonoBehaviour
         {
             currentHeldObject = Instantiate(targetData.inGamePrefab, handSocket);
             currentHeldObject.transform.localRotation = Quaternion.identity;
+            currentHeldAnimator = currentHeldObject.GetComponentInChildren<HeldItemAnimator>();
 
             bobTimer = 0f;        // houpání začne z klidu
             holsterAmount = 1f;   // start schovaný dole
+            swayPositionOffset = Vector3.zero;   // sway začne z klidu (žádné cuknutí při vytažení)
+            swayRotationOffset = Vector3.zero;
+            hasLastSocketRotation = false;
             ApplyHeldItemTransform();
+
+            // Volitelný Draw klip se překrývá s vyjížděním itemu nahoru.
+            if (currentHeldAnimator != null) currentHeldAnimator.PlayDraw();
 
             yield return AnimateHolster(0f);
         }

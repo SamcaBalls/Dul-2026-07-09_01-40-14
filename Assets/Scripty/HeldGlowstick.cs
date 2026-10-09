@@ -21,10 +21,13 @@ public class HeldGlowstick : MonoBehaviour
     [SerializeField] private float throwForce = 8f;
     [Tooltip("Svislá složka hodu (oblouček).")]
     [SerializeField] private float throwUp = 1f;
+    [Tooltip("Zapnuto = glowstick opustí ruku až v momentu animation eventu SecondaryHit. Vypnuto = hned po kliknutí.")]
+    [SerializeField] private bool throwOnAnimationEvent = true;
 
     private HeldItemAnimator heldAnimator;
     private HeldItemAnimationEvents animEvents;
-    private bool useAnimationEvent; // true = rozsvícení řeší animation event, ne kliknutí
+    private bool lightOnEvent; // true = rozsvícení řeší animation event PrimaryHit, ne kliknutí
+    private bool throwOnEvent; // true = hod řeší animation event SecondaryHit, ne kliknutí
     private Camera cam;
 
     private void Awake()
@@ -34,17 +37,20 @@ public class HeldGlowstick : MonoBehaviour
         if (glow == null) glow = GetComponentInChildren<GlowstickGlow>();
         cam = ResolveCamera();
 
-        useAnimationEvent = lightOnAnimationEvent && animEvents != null;
-        if (lightOnAnimationEvent && animEvents == null)
-            Debug.LogWarning($"[HeldGlowstick] '{name}' nemá HeldItemAnimationEvents u Animatoru – svítí se hned po kliknutí.");
+        lightOnEvent = lightOnAnimationEvent && animEvents != null;
+        throwOnEvent = throwOnAnimationEvent && animEvents != null;
+        if ((lightOnAnimationEvent || throwOnAnimationEvent) && animEvents == null)
+            Debug.LogWarning($"[HeldGlowstick] '{name}' nemá HeldItemAnimationEvents u Animatoru – svícení i hod proběhnou hned po kliknutí.");
 
         if (heldAnimator != null)
         {
             heldAnimator.onPrimaryUse.AddListener(OnPrimary);
-            heldAnimator.onSecondaryUse.AddListener(OnThrow);
+            heldAnimator.onSecondaryUse.AddListener(OnSecondary);
         }
-        if (useAnimationEvent)
+        if (lightOnEvent)
             animEvents.onPrimaryHit.AddListener(TryLightOnSurface);
+        if (throwOnEvent)
+            animEvents.onSecondaryHit.AddListener(Throw);
     }
 
     private void OnDestroy()
@@ -52,16 +58,25 @@ public class HeldGlowstick : MonoBehaviour
         if (heldAnimator != null)
         {
             heldAnimator.onPrimaryUse.RemoveListener(OnPrimary);
-            heldAnimator.onSecondaryUse.RemoveListener(OnThrow);
+            heldAnimator.onSecondaryUse.RemoveListener(OnSecondary);
         }
         if (animEvents != null)
+        {
             animEvents.onPrimaryHit.RemoveListener(TryLightOnSurface);
+            animEvents.onSecondaryHit.RemoveListener(Throw);
+        }
     }
 
     // Levé kliknutí: bez animation eventu se zkusí rozsvítit hned.
     private void OnPrimary()
     {
-        if (!useAnimationEvent) TryLightOnSurface();
+        if (!lightOnEvent) TryLightOnSurface();
+    }
+
+    // Pravé kliknutí: bez animation eventu se hodí hned.
+    private void OnSecondary()
+    {
+        if (!throwOnEvent) Throw();
     }
 
     // Když švih zasáhne povrch na dosah → glowstick se rozsvítí naplno.
@@ -77,8 +92,9 @@ public class HeldGlowstick : MonoBehaviour
         }
     }
 
-    // Pravé: glowstick se hodí; stav svícení se přenese na odhozený kus.
-    private void OnThrow()
+    // Hod: glowstick opustí ruku; stav svícení se přenese na odhozený kus.
+    // Volá se buď z kliknutí, nebo z animation eventu SecondaryHit (moment puštění v klipu).
+    private void Throw()
     {
         bool wasGlowing = glow != null && glow.IsGlowing;
         bool wasSpent = glow != null && glow.IsSpent;

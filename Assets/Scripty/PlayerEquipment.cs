@@ -254,11 +254,12 @@ public class PlayerEquipment : MonoBehaviour
         RefreshHeldItem();
     }
 
-    // Hodí aktuálně držený item do světa: spawne worldPrefab před kamerou, pošle ho
-    // dopředu, item spotřebuje (ubere z kapsy i inventáře) a vyprázdní ruku.
+    // Hodí aktuálně držený item do světa: spawne worldPrefab (v ruce = spawnPoint,
+    // jinak před kamerou), pošle ho ve směru pohledu, item spotřebuje (ubere z kapsy
+    // i inventáře) a vyprázdní ruku.
     // Vrací spawnutý objekt (nebo null, když se hodit nedá), ať si volající dořeší
     // navazující stav (např. přenos svícení glowsticku).
-    public GameObject ThrowActiveHeldItem(float force, float up)
+    public GameObject ThrowActiveHeldItem(float force, float up, Transform spawnPoint = null)
     {
         // Hodit jde jen usazený předmět mimo skrýš (ne během vytahování/schovávání).
         if (isHidden || switchRoutine != null || currentHeldObject == null) return null;
@@ -274,9 +275,11 @@ public class PlayerEquipment : MonoBehaviour
             : (Camera.main != null ? Camera.main.transform : null);
         if (origin == null) return null;
 
-        // Spawn kousek před kamerou, ať objekt nevznikne uvnitř hráče.
-        Vector3 spawnPos = origin.position + origin.forward * 0.5f;
-        GameObject obj = Instantiate(prefab, spawnPos, origin.rotation);
+        // Spawn tam, kde je item v ruce (plynulé navázání na animaci hodu);
+        // bez spawnPointu kousek před kamerou, ať objekt nevznikne uvnitř hráče.
+        Vector3 spawnPos = spawnPoint != null ? spawnPoint.position : origin.position + origin.forward * 0.5f;
+        Quaternion spawnRot = spawnPoint != null ? spawnPoint.rotation : origin.rotation;
+        GameObject obj = Instantiate(prefab, spawnPos, spawnRot);
 
         // Aby šel odhozený item zase sebrat.
         WorldItem worldItem = obj.GetComponent<WorldItem>();

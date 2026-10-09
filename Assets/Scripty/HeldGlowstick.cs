@@ -23,6 +23,8 @@ public class HeldGlowstick : MonoBehaviour
     [SerializeField] private float throwUp = 1f;
     [Tooltip("Zapnuto = glowstick opustí ruku až v momentu animation eventu SecondaryHit. Vypnuto = hned po kliknutí.")]
     [SerializeField] private bool throwOnAnimationEvent = true;
+    [Tooltip("Odkud glowstick vyletí (pozice + natočení). Prázdné = animovaný model v ruce (objekt s Animatorem).")]
+    [SerializeField] private Transform throwSpawnPoint;
 
     private HeldItemAnimator heldAnimator;
     private HeldItemAnimationEvents animEvents;
@@ -36,6 +38,12 @@ public class HeldGlowstick : MonoBehaviour
         animEvents = GetComponentInChildren<HeldItemAnimationEvents>();
         if (glow == null) glow = GetComponentInChildren<GlowstickGlow>();
         cam = ResolveCamera();
+
+        if (throwSpawnPoint == null)
+        {
+            Animator modelAnimator = GetComponentInChildren<Animator>();
+            throwSpawnPoint = modelAnimator != null ? modelAnimator.transform : transform;
+        }
 
         lightOnEvent = lightOnAnimationEvent && animEvents != null;
         throwOnEvent = throwOnAnimationEvent && animEvents != null;
@@ -103,7 +111,7 @@ public class HeldGlowstick : MonoBehaviour
 
         if (PlayerEquipment.Instance == null) return;
 
-        GameObject thrown = PlayerEquipment.Instance.ThrowActiveHeldItem(throwForce, throwUp);
+        GameObject thrown = PlayerEquipment.Instance.ThrowActiveHeldItem(throwForce, throwUp, throwSpawnPoint);
         if (thrown == null) return;
 
         GlowstickGlow worldGlow = thrown.GetComponentInChildren<GlowstickGlow>();

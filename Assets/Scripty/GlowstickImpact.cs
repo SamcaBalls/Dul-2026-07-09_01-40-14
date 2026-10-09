@@ -9,6 +9,8 @@ public class GlowstickImpact : MonoBehaviour
     [SerializeField] private GlowstickGlow glow;
 
     [Header("Mapování nárazu na jas")]
+    [Tooltip("Rychlost dopadu (m/s), pod kterou se vůbec nerozsvítí (ať se nerozsvítí kus, co jen leží/dosedá).")]
+    [SerializeField] private float activationSpeed = 1f;
     [Tooltip("Rychlost dopadu (m/s), pod kterou svítí minimálně.")]
     [SerializeField] private float minImpactSpeed = 2f;
     [Tooltip("Rychlost dopadu (m/s), nad kterou svítí maximálně.")]
@@ -29,6 +31,8 @@ public class GlowstickImpact : MonoBehaviour
         if (glow == null || glow.IsGlowing || glow.IsSpent) return;
 
         float speed = collision.relativeVelocity.magnitude;
+        if (speed < activationSpeed) return;
+
         float t = Mathf.InverseLerp(minImpactSpeed, maxImpactSpeed, speed);
         glow.Activate(Mathf.Lerp(minBrightness, maxBrightness, t));
     }

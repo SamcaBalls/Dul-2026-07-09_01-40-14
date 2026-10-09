@@ -283,6 +283,16 @@ public class PlayerEquipment : MonoBehaviour
         if (worldItem == null) worldItem = obj.AddComponent<WorldItem>();
         worldItem.itemData = data;
 
+        // Při hodu dolů by spawn padl do kapsle hráče → odhozený kus nesmí kolidovat s hráčem.
+        Rigidbody playerBody = GetComponentInParent<Rigidbody>();
+        if (playerBody != null)
+        {
+            Collider[] playerColliders = playerBody.GetComponentsInChildren<Collider>();
+            foreach (Collider thrownCol in obj.GetComponentsInChildren<Collider>())
+                foreach (Collider playerCol in playerColliders)
+                    Physics.IgnoreCollision(thrownCol, playerCol);
+        }
+
         // Impulz dopředu + lehký oblouček.
         Rigidbody rb = obj.GetComponent<Rigidbody>();
         if (rb != null)

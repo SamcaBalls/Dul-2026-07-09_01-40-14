@@ -13,6 +13,8 @@ public class HeldGlowstick : MonoBehaviour
     [SerializeField] private float reach = 3f;
     [Tooltip("Do kterých vrstev se švih trefí (ať netrefí hráče/sebe).")]
     [SerializeField] private LayerMask hitMask = ~0;
+    [Tooltip("Zapnuto = rozsvícení až v momentu animation eventu PrimaryHit (HeldItemAnimationEvents na objektu s Animatorem). Vypnuto = hned po kliknutí.")]
+    [SerializeField] private bool lightOnAnimationEvent = true;
 
     [Header("Pravé tlačítko – hod")]
     [Tooltip("Síla hodu dopředu.")]
@@ -21,19 +23,28 @@ public class HeldGlowstick : MonoBehaviour
     [SerializeField] private float throwUp = 1f;
 
     private HeldItemAnimator heldAnimator;
+    private HeldItemAnimationEvents animEvents;
+    private bool useAnimationEvent; // true = rozsvícení řeší animation event, ne kliknutí
     private Camera cam;
 
     private void Awake()
     {
         heldAnimator = GetComponent<HeldItemAnimator>();
+        animEvents = GetComponentInChildren<HeldItemAnimationEvents>();
         if (glow == null) glow = GetComponentInChildren<GlowstickGlow>();
         cam = ResolveCamera();
+
+        useAnimationEvent = lightOnAnimationEvent && animEvents != null;
+        if (lightOnAnimationEvent && animEvents == null)
+            Debug.LogWarning($"[HeldGlowstick] '{name}' nemá HeldItemAnimationEvents u Animatoru – svítí se hned po kliknutí.");
 
         if (heldAnimator != null)
         {
             heldAnimator.onPrimaryUse.AddListener(OnPrimary);
             heldAnimator.onSecondaryUse.AddListener(OnThrow);
         }
+        if (useAnimationEvent)
+            animEvents.onPrimaryHit.AddListener(TryLightOnSurface);
     }
 
     private void OnDestroy()
@@ -43,15 +54,24 @@ public class HeldGlowstick : MonoBehaviour
             heldAnimator.onPrimaryUse.RemoveListener(OnPrimary);
             heldAnimator.onSecondaryUse.RemoveListener(OnThrow);
         }
+        if (animEvents != null)
+            animEvents.onPrimaryHit.RemoveListener(TryLightOnSurface);
     }
 
-    // Levé: když švih zasáhne povrch na dosah → glowstick se rozsvítí naplno.
+    // Levé kliknutí: bez animation eventu se zkusí rozsvítit hned.
     private void OnPrimary()
+    {
+        if (!useAnimationEvent) TryLightOnSurface();
+    }
+
+    // Když švih zasáhne povrch na dosah → glowstick se rozsvítí naplno.
+    // Volá se buď z kliknutí, nebo z animation eventu PrimaryHit (moment zásahu v klipu).
+    private void TryLightOnSurface()
     {
         if (glow == null || cam == null) return;
 
         if (Physics.Raycast(cam.transform.position, cam.transform.forward,
-                out RaycastHit hit, reach, hitMask, QueryTriggerInteraction.Ignore))
+                out _, reach, hitMask, QueryTriggerInteraction.Ignore))
         {
             glow.Activate(1f);
         }

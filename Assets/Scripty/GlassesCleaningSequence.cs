@@ -87,6 +87,10 @@ public class GlassesCleaningSequence : MonoBehaviour
     {
         isRunning = true;
 
+        // Během utírání má hráč plné ruce brýlí – schováme držený předmět (sjede dolů a zmizí).
+        if (PlayerEquipment.Instance != null)
+            PlayerEquipment.Instance.SetHidden(true);
+
         // --- 1. MRKNUTÍ (Zavření oka do absolutní tmy přes ObecnyVolume) ---
         yield return StartCoroutine(AnimateBlink(0f, 1f, 0f, -10f, blinkSpeed));
 
@@ -111,7 +115,11 @@ public class GlassesCleaningSequence : MonoBehaviour
 
         // --- Otevření oka ---
         yield return StartCoroutine(AnimateBlink(1f, 0f, -10f, 0f, blinkSpeed));
-        
+
+        // Brýle jsou čisté – vrátíme předmět zpět do ruky (vyjede nahoru).
+        if (PlayerEquipment.Instance != null)
+            PlayerEquipment.Instance.SetHidden(false);
+
         isRunning = false;
     }
 

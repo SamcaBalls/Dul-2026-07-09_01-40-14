@@ -2,7 +2,7 @@ using UnityEngine;
 
 // "Svítící zařízení" glowsticku – jediný vlastník Lightu, emise a plynulého vyhasínání.
 // Sedí na drženém i světovém prefabu. Nezná input ani házení.
-public class GlowstickGlow : MonoBehaviour
+public class GlowstickGlow : MonoBehaviour, IPersistentItemState
 {
     [Header("Light")]
     [Tooltip("Point light glowsticku. Prázdné = najde se v children, a když žádný není, vytvoří se.")]
@@ -91,7 +91,30 @@ public class GlowstickGlow : MonoBehaviour
         {
             isGlowing = true;
             glowLight.enabled = true;
+            ApplyBrightness(); // hned, ať nově vytvořený kus neblikne na snímek tmou
         }
+    }
+
+    // Uloží svícení do stavu kusu v inventáři (volá PlayerEquipment před schováním).
+    public void SaveState(ItemRuntimeState state)
+    {
+        state.glow = new GlowSnapshot
+        {
+            isGlowing = isGlowing,
+            isSpent = isSpent,
+            brightness01 = brightness01,
+            life01 = life01,
+        };
+    }
+
+    // Obnoví svícení z uloženého stavu (volá PlayerEquipment po vytažení). Bez zvuku.
+    public void LoadState(ItemRuntimeState state)
+    {
+        if (!state.glow.HasValue) return;
+        GlowSnapshot g = state.glow.Value;
+
+        if (g.isSpent) MarkSpent();
+        else if (g.isGlowing) ActivateContinued(g.brightness01, g.life01);
     }
 
     // Označí jako dohořelý – už nikdy nesvítí (hod dohořelého kusu).
@@ -118,6 +141,12 @@ public class GlowstickGlow : MonoBehaviour
             return;
         }
 
+        ApplyBrightness();
+    }
+
+    // Promítne aktuální život × jas do Lightu a emise.
+    private void ApplyBrightness()
+    {
         float k = fadeCurve.Evaluate(life01) * brightness01;
         glowLight.intensity = maxIntensity * k;
         ApplyEmission(k);

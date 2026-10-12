@@ -51,14 +51,22 @@ public class PlayerEquipment : MonoBehaviour
     [Tooltip("Odkud se počítá pozice a směr hodu (obvykle kamera hráče). Prázdné = Camera.main.")]
     [SerializeField] private Transform throwOrigin;
 
+    [Header("Inventář")]
+    [Tooltip("Když je inventář otevřený, Primary/Secondary akce itemů nejdou použít. Prázdné = najde se automaticky.")]
+    [SerializeField] private InventoryUI inventoryUI;
+
     // Uložené předměty v kapsách
     private ItemData pocket1Data;
     private ItemData pocket2Data;
+    // Stav konkrétních kusů v kapsách (patří UIInventoryItem, tady jen reference).
+    private ItemRuntimeState pocket1State;
+    private ItemRuntimeState pocket2State;
 
     // 0 = nic nedrží, 1 = drží předmět z Kapsy 1 (Q), 2 = drží předmět z Kapsy 2 (E)
     private int activePocket = 0;
     private GameObject currentHeldObject; // Aktuálně vytvořený 3D/2D model v ruce
     private HeldItemAnimator currentHeldAnimator; // Animátor klipů aktuálně drženého itemu (může být null)
+    private ItemRuntimeState currentHeldState;     // Stav kusu, který je právě v ruce (kam se uloží při schování)
     private float bobTimer = 0f; // Čas pro výpočet houpání drženého předmětu
 
     // Sway: zaostávání předmětu podle změny rotace pohledu (handSocket) mezi snímky.
@@ -76,6 +84,11 @@ public class PlayerEquipment : MonoBehaviour
     {
         if (Instance == null) Instance = this;
         else Destroy(gameObject);
+    }
+
+    private void Start()
+    {
+        if (inventoryUI == null) inventoryUI = FindAnyObjectByType<InventoryUI>();
     }
 
     private void OnEnable()
@@ -118,7 +131,9 @@ public class PlayerEquipment : MonoBehaviour
                 bobTimer += Time.deltaTime * bobFrequency * Mathf.PI * 2f;
 
             // Použití drženého itemu – jen když není schovaný a zrovna neprobíhá přepínání/vytahování.
-            if (!isHidden && switchRoutine == null && currentHeldAnimator != null)
+            // V otevřeném inventáři klik myší patří UI, ne itemu.
+            bool inventoryOpen = inventoryUI != null && inventoryUI.IsOpen;
+            if (!isHidden && !inventoryOpen && switchRoutine == null && currentHeldAnimator != null)
             {
                 if (primaryUseAction != null && primaryUseAction.action.WasPressedThisFrame())
                     currentHeldAnimator.TryPrimaryUse();
@@ -202,10 +217,10 @@ public class PlayerEquipment : MonoBehaviour
     }
 
     // Volá se z UI při vložení itemu do kapsy
-    public void EquipItem(int pocketIndex, ItemData itemData)
+    public void EquipItem(int pocketIndex, ItemData itemData, ItemRuntimeState state = null)
     {
-        if (pocketIndex == 1) pocket1Data = itemData;
-        if (pocketIndex == 2) pocket2Data = itemData;
+        if (pocketIndex == 1) { pocket1Data = itemData; pocket1State = state; }
+        if (pocketIndex == 2) { pocket2Data = itemData; pocket2State = state; }
 
         // Pokud drží zrovna tuto kapsu, aktualizuje předmět v ruce
         if (activePocket == pocketIndex)
@@ -217,8 +232,8 @@ public class PlayerEquipment : MonoBehaviour
     // Volá se z UI při vyndání itemu z kapsy
     public void UnequipItem(int pocketIndex)
     {
-        if (pocketIndex == 1) pocket1Data = null;
-        if (pocketIndex == 2) pocket2Data = null;
+        if (pocketIndex == 1) { pocket1Data = null; pocket1State = null; }
+        if (pocketIndex == 2) { pocket2Data = null; pocket2State = null; }
 
         // Pokud vyndal předmět z kapsy, kterou zrovna držel, zruší ho z ruky
         if (activePocket == pocketIndex)
@@ -306,12 +321,14 @@ public class PlayerEquipment : MonoBehaviour
             InventoryManager.Instance.RemovePocketItem(activePocket);
 
         // Okamžité vyprázdnění ruky (bez holster animace) – item z kapsy zmizel.
+        // Stav se neukládá – kus opustil inventář (svícení přenáší HeldGlowstick na odhozený kus).
         Destroy(currentHeldObject);
         currentHeldObject = null;
         currentHeldAnimator = null;
+        currentHeldState = null;
 
-        if (activePocket == 1) pocket1Data = null;
-        else if (activePocket == 2) pocket2Data = null;
+        if (activePocket == 1) { pocket1Data = null; pocket1State = null; }
+        else if (activePocket == 2) { pocket2Data = null; pocket2State = null; }
 
         return obj;
     }
@@ -324,25 +341,35 @@ public class PlayerEquipment : MonoBehaviour
         return null;
     }
 
+    private ItemRuntimeState GetActiveState()
+    {
+        if (activePocket == 1) return pocket1State;
+        if (activePocket == 2) return pocket2State;
+        return null;
+    }
+
     // Spustí přechod na aktuálně platný předmět (schová starý dolů, vytáhne nový nahoru).
     private void RefreshHeldItem()
     {
         // Ve skrýši nic nedržíme, jinak předmět z aktivní kapsy.
         ItemData targetData = isHidden ? null : GetActiveData();
+        ItemRuntimeState targetState = isHidden ? null : GetActiveState();
 
         if (switchRoutine != null) StopCoroutine(switchRoutine);
-        switchRoutine = StartCoroutine(SwitchHeldItemRoutine(targetData));
+        switchRoutine = StartCoroutine(SwitchHeldItemRoutine(targetData, targetState));
     }
 
-    private IEnumerator SwitchHeldItemRoutine(ItemData targetData)
+    private IEnumerator SwitchHeldItemRoutine(ItemData targetData, ItemRuntimeState targetState)
     {
         // 1) Když něco držíme, sjede to dolů (zajede) a zničíme to.
         if (currentHeldObject != null)
         {
             yield return AnimateHolster(1f);
+            SaveHeldState();
             Destroy(currentHeldObject);
             currentHeldObject = null;
             currentHeldAnimator = null;
+            currentHeldState = null;
         }
 
         // 2) Když má nový item model, vytvoří se dole a vyjede nahoru (přijede zespoda).
@@ -351,6 +378,8 @@ public class PlayerEquipment : MonoBehaviour
             currentHeldObject = Instantiate(targetData.inGamePrefab, handSocket);
             currentHeldObject.transform.localRotation = Quaternion.identity;
             currentHeldAnimator = currentHeldObject.GetComponentInChildren<HeldItemAnimator>();
+            currentHeldState = targetState;
+            LoadHeldState();
 
             bobTimer = 0f;        // houpání začne z klidu
             holsterAmount = 1f;   // start schovaný dole
@@ -366,6 +395,22 @@ public class PlayerEquipment : MonoBehaviour
         }
 
         switchRoutine = null;
+    }
+
+    // Uloží stav modelu v ruce (např. jas glowsticku) do stavu kusu v inventáři.
+    private void SaveHeldState()
+    {
+        if (currentHeldObject == null || currentHeldState == null) return;
+        foreach (IPersistentItemState p in currentHeldObject.GetComponentsInChildren<IPersistentItemState>(true))
+            p.SaveState(currentHeldState);
+    }
+
+    // Obnoví stav právě vytvořeného modelu v ruce z kusu v inventáři.
+    private void LoadHeldState()
+    {
+        if (currentHeldObject == null || currentHeldState == null) return;
+        foreach (IPersistentItemState p in currentHeldObject.GetComponentsInChildren<IPersistentItemState>(true))
+            p.LoadState(currentHeldState);
     }
 
     // Plynule přesune holsterAmount na cíl (0 = vytažený, 1 = schovaný) za holsterDuration sekund.

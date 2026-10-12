@@ -42,7 +42,7 @@ public class UIDropZone : MonoBehaviour, IDropHandler
                 if (draggedItem.currentPocketIndex != 0)
                     PlayerEquipment.Instance.UnequipItem(draggedItem.currentPocketIndex);
 
-                PlayerEquipment.Instance.EquipItem(pocketIndex, draggedItem.itemData);
+                PlayerEquipment.Instance.EquipItem(pocketIndex, draggedItem.itemData, draggedItem.RuntimeState);
             }
             draggedItem.currentPocketIndex = pocketIndex;
 
@@ -64,7 +64,7 @@ public class UIDropZone : MonoBehaviour, IDropHandler
                 {
                     existingItem.currentPocketIndex = swapZone.pocketIndex;
                     if (PlayerEquipment.Instance != null)
-                        PlayerEquipment.Instance.EquipItem(swapZone.pocketIndex, existingItem.itemData);
+                        PlayerEquipment.Instance.EquipItem(swapZone.pocketIndex, existingItem.itemData, existingItem.RuntimeState);
                 }
                 else
                 {

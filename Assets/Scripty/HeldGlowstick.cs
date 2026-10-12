@@ -15,6 +15,12 @@ public class HeldGlowstick : MonoBehaviour
     [SerializeField] private LayerMask hitMask = ~0;
     [Tooltip("Zapnuto = rozsvícení až v momentu animation eventu PrimaryHit (HeldItemAnimationEvents na objektu s Animatorem). Vypnuto = hned po kliknutí.")]
     [SerializeField] private bool lightOnAnimationEvent = true;
+    [Tooltip("Zvuk rozsvícení v ruce (prasknutí svítivky). Prázdné = bez zvuku.")]
+    [SerializeField] private AudioClip lightSound;
+    [Tooltip("Hlasitost zvuku rozsvícení.")]
+    [SerializeField, Range(0f, 1f)] private float lightSoundVolume = 1f;
+    [Tooltip("AudioSource pro zvuk rozsvícení. Prázdné = najde se na objektu, a když žádný není, vytvoří se.")]
+    [SerializeField] private AudioSource audioSource;
 
     [Header("Pravé tlačítko – hod")]
     [Tooltip("Síla hodu dopředu.")]
@@ -96,8 +102,26 @@ public class HeldGlowstick : MonoBehaviour
         if (Physics.Raycast(cam.transform.position, cam.transform.forward,
                 out _, reach, hitMask, QueryTriggerInteraction.Ignore))
         {
+            // Dohořelý kus se už nerozsvítí → ani nezazní.
+            if (glow.IsSpent) return;
             glow.Activate(1f);
+            PlayLightSound();
+            if (heldAnimator != null) heldAnimator.PlayPrimaryHitSuccess();
         }
+    }
+
+    private void PlayLightSound()
+    {
+        if (lightSound == null) return;
+        if (audioSource == null) audioSource = GetComponent<AudioSource>();
+        if (audioSource == null)
+        {
+            // Zvuk v ruce = u ucha hráče, takže 2D (bez prostorového tlumení).
+            audioSource = gameObject.AddComponent<AudioSource>();
+            audioSource.playOnAwake = false;
+            audioSource.spatialBlend = 0f;
+        }
+        audioSource.PlayOneShot(lightSound, lightSoundVolume);
     }
 
     // Hod: glowstick opustí ruku; stav svícení se přenese na odhozený kus.

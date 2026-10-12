@@ -7,6 +7,8 @@ public class UIInventoryItem : MonoBehaviour, IBeginDragHandler, IDragHandler, I
 {
     public ItemData itemData;
     [HideInInspector] public int currentPocketIndex = 0; // 0 = v batohu, 1/2 = v kapse
+    // Stav tohohle konkrétního kusu (např. jak moc svítí glowstick) – přežije schování/vytažení.
+    public ItemRuntimeState RuntimeState { get; } = new ItemRuntimeState();
     private Image itemImage;
     private CanvasGroup canvasGroup;
     private RectTransform rectTransform;
@@ -71,14 +73,32 @@ public class UIInventoryItem : MonoBehaviour, IBeginDragHandler, IDragHandler, I
         canvasGroup.alpha = 1f;
 
         // Pokud má item na konci tahu stále jako parenta hlavní Canvas,
-        // znamená to, že DropZone ho NEPŘIJALA (byl puštěn mimo, nebo je kapsa plná)
+        // znamená to, že žádná DropZone ho NEPŘIJALA = byl puštěn mimo batoh i kapsy.
+        // → VYHODÍME ho do světa (na zem před hráče).
         if (transform.parent == parentCanvas.transform)
         {
-            // Vrátíme ho přesně tam, odkud ho vzal
-            transform.SetParent(originalParent, true);
-            rectTransform.anchoredPosition = originalPosition;
-            rectTransform.localRotation = originalRotation;
+            DropToWorld();
         }
+    }
+
+    // Vyhodí tenhle item z batohu do světa a zničí jeho UI reprezentaci.
+    private void DropToWorld()
+    {
+        // Byl item v kapse? Odhlásíme ji, ať zmizí i z ruky hráče.
+        if (currentPocketIndex != 0 && PlayerEquipment.Instance != null)
+        {
+            PlayerEquipment.Instance.UnequipItem(currentPocketIndex);
+            currentPocketIndex = 0;
+        }
+
+        // Zrušíme případný hover text mířící na tenhle item (než ho zničíme).
+        if (ItemHoverName.Instance != null)
+            ItemHoverName.Instance.SetHovered(this, false);
+
+        if (InventoryManager.Instance != null && itemData != null)
+            InventoryManager.Instance.DropItemToWorld(itemData);
+
+        Destroy(gameObject);
     }
 
     // Kursor najel na item → nahlásíme jeho jméno do textu.

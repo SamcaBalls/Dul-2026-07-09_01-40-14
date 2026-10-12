@@ -17,6 +17,16 @@ public class InventoryManager : MonoBehaviour
     [Tooltip("Max náhodné zpoždění startu mezi jednotlivými kusy (kaskáda).")]
     public float spillMaxDelay = 0.15f;
 
+    [Header("Vyhazování na zem (Drop)")]
+    [Tooltip("Odkud se počítá pozice a směr vyhození (obvykle kamera hráče). Prázdné = zkusí se Camera.main.")]
+    public Transform dropOrigin;
+    [Tooltip("Jak daleko před hráče se item vyhodí (v metrech).")]
+    public float dropForwardDistance = 0.8f;
+    [Tooltip("Svislý posun místa spawnu oproti dropOrigin (např. -0.2 = kousek pod úroveň očí).")]
+    public float dropHeightOffset = -0.2f;
+    [Tooltip("Jak silně se item pošle dopředu při vyhození (jen když má Rigidbody).")]
+    public float dropForce = 1.5f;
+
     private void Awake()
     {
         if (Instance == null) Instance = this;
@@ -27,6 +37,79 @@ public class InventoryManager : MonoBehaviour
     {
         // Reset váhy při startu hry
         playerStats.currentTotalWeight = 0f;
+
+        // Když není origin nastavený ručně, zkusíme hlavní kameru.
+        if (dropOrigin == null && Camera.main != null)
+            dropOrigin = Camera.main.transform;
+    }
+
+    // Vyhodí item z batohu do světa – ubere váhu a spawne fyzický objekt před hráče.
+    // Volá UIInventoryItem, když hráč přetáhne item ven z batohu i kapes.
+    public void DropItemToWorld(ItemData itemData)
+    {
+        if (itemData == null) return;
+
+        // Item opouští batoh → ubereme jeho váhu (neklesneme pod nulu).
+        playerStats.currentTotalWeight = Mathf.Max(0f, playerStats.currentTotalWeight - itemData.weight);
+
+        // Přednostně worldPrefab, jinak fallback na inGamePrefab.
+        GameObject prefab = itemData.worldPrefab != null ? itemData.worldPrefab : itemData.inGamePrefab;
+        if (prefab == null)
+        {
+            Debug.LogWarning($"[Inventory] Item '{itemData.itemName}' nemá worldPrefab ani inGamePrefab – nelze vyhodit.");
+            return;
+        }
+
+        Transform origin = dropOrigin != null ? dropOrigin : (Camera.main != null ? Camera.main.transform : null);
+        if (origin == null)
+        {
+            Debug.LogWarning("[Inventory] Chybí dropOrigin i Camera.main – item se nedá kam vyhodit.");
+            return;
+        }
+
+        // Vodorovný směr pohledu (bez sklonu nahoru/dolů), ať item padá rozumně před hráče.
+        Vector3 forward = origin.forward;
+        forward.y = 0f;
+        forward = forward.sqrMagnitude > 0.0001f ? forward.normalized : origin.forward;
+
+        Vector3 spawnPos = origin.position + forward * dropForwardDistance + Vector3.up * dropHeightOffset;
+
+        GameObject obj = Instantiate(prefab, spawnPos, Quaternion.identity);
+
+        // Zajistíme, že objekt ve světě ví, jaký je to item (aby šel zase sebrat).
+        WorldItem worldItem = obj.GetComponent<WorldItem>();
+        if (worldItem == null) worldItem = obj.AddComponent<WorldItem>();
+        worldItem.itemData = itemData;
+
+        // Když má Rigidbody, lehce ho pošleme dopředu, ať se odkutálí od hráče.
+        Rigidbody rb = obj.GetComponent<Rigidbody>();
+        if (rb != null) rb.AddForce(forward * dropForce, ForceMode.VelocityChange);
+    }
+
+    // Kompletně odstraní item z dané kapsy: ubere jeho váhu a zničí jeho UI reprezentaci.
+    // Volá PlayerEquipment při hodu drženého itemu (hod item spotřebuje).
+    public void RemovePocketItem(int pocketIndex)
+    {
+        if (pocketIndex == 0) return;
+
+        UIInventoryItem[] items = FindObjectsByType<UIInventoryItem>(
+            FindObjectsInactive.Include, FindObjectsSortMode.None);
+
+        foreach (UIInventoryItem ui in items)
+        {
+            if (ui.currentPocketIndex != pocketIndex) continue;
+
+            if (ui.itemData != null)
+                playerStats.currentTotalWeight =
+                    Mathf.Max(0f, playerStats.currentTotalWeight - ui.itemData.weight);
+
+            // Zrušíme případný hover text mířící na tenhle item (než ho zničíme).
+            if (ItemHoverName.Instance != null)
+                ItemHoverName.Instance.SetHovered(ui, false);
+
+            Destroy(ui.gameObject);
+            return;
+        }
     }
 
     // Voláš odkudkoliv ze hry, když hráč něco sebere ze země

@@ -9,4 +9,7 @@ public class ItemData : ScriptableObject
     
     [Header("In-Game")]
     public GameObject inGamePrefab; // <-- NOVÉ: Objekt, který se hráči reálně spawne v ruce
+
+    [Tooltip("Objekt, který leží na zemi a dá se sebrat/vyhodit (potřebuje Collider + Rigidbody + WorldItem). Prázdné = použije se inGamePrefab.")]
+    public GameObject worldPrefab;
 }

@@ -48,8 +48,21 @@ public class HidingSpot : MonoBehaviour
     [Tooltip("Jak dlouho hlava (kamera) plynule srovnává (lerpuje) na správnou rotaci po skončení výstupní animace.")]
     public float headExitLerpDuration = 0.4f;
 
-    private bool isTransitioning = false; 
-    private bool isFullyHidden = false;   
+    private bool isTransitioning = false;
+    private bool isFullyHidden = false;
+
+    // Dá se do téhle skrýše zrovna vlézt (schovat se)? Neběží animace, není obsazená a neběží čištění brýlí.
+    public bool CanEnter => !isTransitioning && !isFullyHidden && (bryle == null || !bryle.isRunning);
+
+    // Může se hráč z TÉHLE pozice zrovna schovat? = jde vlézt (CanEnter) A přichází z povoleného směru.
+    // Schování totiž jde jen z povolených směrů (directionSettings[].isEnabled) – tohle používá
+    // PlayerInteract, ať se prompt "Schovat se" ukáže jen když stisk F fakt zabere.
+    public bool CanEnterFrom(Vector3 playerPosition)
+    {
+        if (!CanEnter) return false;
+        DirectionData data = GetDirectionData(CalculateInteractionDirection(playerPosition));
+        return data != null && data.isEnabled;
+    }
 
     private PlayerRigidbodyMovement playerMovementScript;
     private GameObject playerObject;

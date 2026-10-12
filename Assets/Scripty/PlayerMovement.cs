@@ -55,9 +55,12 @@ public class PlayerRigidbodyMovement : MonoBehaviour
     public float vaultWallThicknessOffset = 0.7f;
     [Tooltip("Úhel, o který se nakloní hlava/kamera během přelézání (ve stupních).")]
     public float vaultMaxLeanAngle = 5f;
+    [Tooltip("Jak vysoko (v metrech) se hráč zvedne v oblouku během přelézání. Oblouk má plynulý rozjezd i dosednutí (žádné cuknutí).")]
+    public float vaultArcHeight = 0.6f;
 
     [Header("Kontrola země (Ground Check)")]
-    public float groundCheckDistance = 1.1f;
+    [Tooltip("Rezerva POD chodidly, do které se ještě počítá zem (kvůli schodům/nerovnostem). Skutečná délka paprsku se dopočítá z výšky kapsle, takže platí, i když se kapsle za běhu roztáhne na standingHeight.")]
+    public float groundCheckDistance = 0.3f;
     public LayerMask groundLayer;
 
     // Privátní komponenty a proměnné
@@ -154,7 +157,14 @@ public class PlayerRigidbodyMovement : MonoBehaviour
 
     void CheckGround()
     {
-        isGrounded = Physics.Raycast(transform.position, Vector3.down, groundCheckDistance, groundLayer);
+        // Chodidla jsou pod pivotem (transform.position) o (půlka výšky kapsle − posun středu).
+        // Kapsle se za běhu roztáhne z ~1.66 m na standingHeight (2 m), takže chodidla klesnou
+        // ~1.17 m pod pivot. Pevná groundCheckDistance (1.1) na ně přestala dosáhnout → isGrounded
+        // bylo pořád false a HandleHeadbob padal do reset větve = žádný headbob vestoje.
+        // Paprsek proto natáhneme přesně ke chodidlům + rezerva, ať platí při jakékoli výšce kapsle.
+        float pivotToFeet = capsuleCollider.height * 0.5f - capsuleCollider.center.y;
+        float rayLength = pivotToFeet + groundCheckDistance;
+        isGrounded = Physics.Raycast(transform.position, Vector3.down, rayLength, groundLayer);
     }
 
     void HandleMouseLook()
@@ -307,9 +317,13 @@ public class PlayerRigidbodyMovement : MonoBehaviour
     IEnumerator PerformVault(Vector3 targetPosition, float customDuration)
     {
         isVaulting = true;
-        
-        rb.isKinematic = true; 
-        capsuleCollider.enabled = false; 
+
+        // Při přelézání schováme předmět z ruky (sjede dolů), ať ho hráč nemá v rukou.
+        if (PlayerEquipment.Instance != null)
+            PlayerEquipment.Instance.SetHidden(true);
+
+        rb.isKinematic = true;
+        capsuleCollider.enabled = false;
         
         float elapsedTime = 0;
         Vector3 startPosition = transform.position;
@@ -326,7 +340,10 @@ public class PlayerRigidbodyMovement : MonoBehaviour
 
             float newX = Mathf.Lerp(startPosition.x, targetPosition.x, smoothT);
             float newZ = Mathf.Lerp(startPosition.z, targetPosition.z, smoothT);
-            float newY = targetPosition.y; 
+            // Oblouk pomocí sin^2: svislá rychlost je NULOVÁ na začátku i na konci → hladký rozjezd a hlavně hladké dosednutí bez cuknutí.
+            float arcPhase = Mathf.Sin(t * Mathf.PI);
+            float arc = vaultArcHeight * arcPhase * arcPhase;
+            float newY = Mathf.Lerp(startPosition.y, targetPosition.y, smoothT) + arc;
             transform.position = new Vector3(newX, newY, newZ);
             
             transform.rotation = Quaternion.Slerp(startPlayerRotation, targetPlayerRotation, smoothT);
@@ -342,10 +359,23 @@ public class PlayerRigidbodyMovement : MonoBehaviour
         }
 
         transform.position = targetPosition;
-        SetPlayerRotation(targetPlayerRotation);
-        
+
+        // NEVOLÁME SetPlayerRotation – ta nuluje rotationX (svislý pohled) a přehazuje kameru na identity,
+        // což způsobovalo cuknutí hlavy nahoru po přelezení. Yaw těla srovnáme na směr přelezení,
+        // ale svislý pohled (rotationX) i plynulé řízení kamery ponecháme beze změny.
+        transform.rotation = targetPlayerRotation;
+        targetBodyRotation = targetPlayerRotation;
+        if (cameraHolder != null)
+        {
+            cameraHolder.localRotation = Quaternion.Euler(rotationX, 0f, 0f); // sundá náklon (lean), zachová pohled nahoru/dolů
+        }
+
         capsuleCollider.enabled = true;
         rb.isKinematic = false;
+
+        // Po dokončení přelézání předmět zase vytáhneme (vyjede nahoru).
+        if (PlayerEquipment.Instance != null)
+            PlayerEquipment.Instance.SetHidden(false);
 
         isVaulting = false;
         Debug.Log("[Vault] Hotovo!");

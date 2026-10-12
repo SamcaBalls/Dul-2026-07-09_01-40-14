@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!221 &22100000
+AnimatorOverrideController:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Glowstick
+  m_Controller: {fileID: 9100000, guid: ec244f9328c2b944ea8ffd1469c7f878, type: 2}
+  m_Clips:
+  - m_OriginalClip: {fileID: 7400000, guid: a548778fde6faa64e9443d998d460870, type: 2}
+    m_OverrideClip: {fileID: 7400000, guid: a3f58ce006a924640874377cac5ab10d, type: 2}
+  - m_OriginalClip: {fileID: 7400000, guid: 607409f47f9480b4c86f362e9ec2a453, type: 2}
+    m_OverrideClip: {fileID: 7400000, guid: 7091bf45e74a8284997190d5880766a5, type: 2}
+  - m_OriginalClip: {fileID: 7400000, guid: 6c03c5af67bbc544d854b4211ceeee4d, type: 2}
+    m_OverrideClip: {fileID: 7400000, guid: 1dcdb2c2aab4b7f429f407eb76ad34d8, type: 2}
+  - m_OriginalClip: {fileID: 7400000, guid: fa58ad96d40d9c74fbfc51f5fbc6cff9, type: 2}
+    m_OverrideClip: {fileID: 7400000, guid: c2ac436738d24d343a6a2878fff1c2a4, type: 2}
+  - m_OriginalClip: {fileID: 7400000, guid: 0e462a8b91d64c758e060532a2522582, type: 2}
+    m_OverrideClip: {fileID: 7400000, guid: c807cf071103442cb594c4697e908588, type: 2}

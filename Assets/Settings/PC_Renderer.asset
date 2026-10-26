@@ -172,7 +172,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: df125a9a5a33a25489710e6ebf3f9639, type: 3}
   m_Name: CRTRenderFeature
   m_EditorClassIdentifier: Assembly-CSharp::CRTRenderFeature
-  m_Active: 1
+  m_Active: 0
   settings:
     crtShader: {fileID: 4800000, guid: b13848da69629f343a551a854ea582d9, type: 3}
     decalTex: {fileID: 0}

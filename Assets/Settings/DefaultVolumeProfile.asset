@@ -977,25 +977,25 @@ MonoBehaviour:
   active: 1
   isActive:
     m_OverrideState: 1
-    m_Value: 1
+    m_Value: 0
   chromaticAberration:
     m_OverrideState: 1
-    m_Value: 0.0333
+    m_Value: 0
   screenJump:
     m_OverrideState: 1
-    m_Value: 0.856
+    m_Value: 0
   flickering:
     m_OverrideState: 1
-    m_Value: 0.0737
+    m_Value: 0
   scanlines:
     m_OverrideState: 1
-    m_Value: 1
+    m_Value: 0
   whiteNoise:
     m_OverrideState: 1
-    m_Value: 1
+    m_Value: 0
   monochrome:
     m_OverrideState: 1
-    m_Value: 1
+    m_Value: 0
   filmDirt:
     m_OverrideState: 1
     m_Value: 0

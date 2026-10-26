@@ -10,6 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 2738782390374949391}
   - component: {fileID: 2460794374061114691}
+  - component: {fileID: 4815162342108151623}
   m_Layer: 0
   m_Name: SekyraDoRuky
   m_TagString: Untagged
@@ -49,6 +50,7 @@ MonoBehaviour:
   drawTrigger: Draw
   primaryTrigger: UsePrimary
   secondaryTrigger: UseSecondary
+  primaryHitSuccessTrigger: PrimaryHitSuccess
   useCooldown: 0.5
   onPrimaryUse:
     m_PersistentCalls:
@@ -56,6 +58,25 @@ MonoBehaviour:
   onSecondaryUse:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &4815162342108151623
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5261463872022289932}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dd967d9f4f5546e98dd5b805ed4bcfbc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MeleeToolDamage
+  range: 3
+  damage: 1
+  hitMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  ignoreTriggers: 1
+  hitOnAnimationEvent: 1
 --- !u!1001 &60010781343085890
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -115,6 +136,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: f76467a385bcf9046a5101225978d7ea, type: 3}
       insertIndex: -1
       addedObject: {fileID: 7337654161461121428}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: f76467a385bcf9046a5101225978d7ea, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 5099405356357360748}
   m_SourcePrefab: {fileID: 100100000, guid: f76467a385bcf9046a5101225978d7ea, type: 3}
 --- !u!4 &531295020739236521 stripped
 Transform:
@@ -148,3 +172,21 @@ Animator:
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
   m_WriteDefaultValuesOnDisable: 0
+--- !u!114 &5099405356357360748
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 870420328082884627}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: eda1ca129af03bb4696b0316925d5834, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::HeldItemAnimationEvents
+  onPrimaryHit:
+    m_PersistentCalls:
+      m_Calls: []
+  onSecondaryHit:
+    m_PersistentCalls:
+      m_Calls: []

@@ -133,12 +133,17 @@ public class PlayerEquipment : MonoBehaviour
             // Použití drženého itemu – jen když není schovaný a zrovna neprobíhá přepínání/vytahování.
             // V otevřeném inventáři klik myší patří UI, ne itemu.
             bool inventoryOpen = inventoryUI != null && inventoryUI.IsOpen;
-            if (!isHidden && !inventoryOpen && switchRoutine == null && currentHeldAnimator != null)
+            if (!isHidden && !inventoryOpen && switchRoutine == null)
             {
                 if (primaryUseAction != null && primaryUseAction.action.WasPressedThisFrame())
-                    currentHeldAnimator.TryPrimaryUse();
+                {
+                    // Nástroj s vlastní logikou (sekyra) si sám rozhodne, jestli švihnout.
+                    IPrimaryUse primaryUse = currentHeldObject.GetComponentInChildren<IPrimaryUse>();
+                    if (primaryUse != null) primaryUse.OnPrimaryUse();
+                    else if (currentHeldAnimator != null) currentHeldAnimator.TryPrimaryUse();
+                }
 
-                if (secondaryUseAction != null && secondaryUseAction.action.WasPressedThisFrame())
+                if (secondaryUseAction != null && secondaryUseAction.action.WasPressedThisFrame() && currentHeldAnimator != null)
                     currentHeldAnimator.TrySecondaryUse();
             }
 
